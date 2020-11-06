@@ -27,7 +27,7 @@ type Bot struct {
 
 	MsgOffset int64 // 最后一条消息
 
-	activeProcessorFunc ActiveProcessorFunc
+	activeProcessorFunc []ActiveProcessorFunc
 
 	commands       map[string]MessageProcessorFunc // 指定命令的执行方法
 	defaultCommand MessageProcessorFunc            // 默认命令未指定命令时使用
@@ -293,7 +293,7 @@ type MessageContextAtVideoNote struct {
 // ProcessorAtVideoNoteFunc 视频笔记消息处理函数
 type ProcessorAtVideoNoteFunc func(c *MessageContextAtVideoNote) error
 
-func (b *Bot) SetMessageProcessorAtideoNot(fn ProcessorAtVideoNoteFunc) {
+func (b *Bot) SetMessageProcessorAtVideoNote(fn ProcessorAtVideoNoteFunc) {
 	b.setMessageProcessorAt(ContextTypeAtVideoNote, fn)
 }
 
@@ -395,12 +395,15 @@ func (b *Bot) SetMessageProcessor(handleMessageFunc MessageProcessorFunc) {
 	b.defaultMessageProcessorFunc = handleMessageFunc
 }
 
-// SetActiveProcessor 设置主动处理器
-func (b *Bot) SetActiveProcessor(activeProcessorFunc ActiveProcessorFunc) {
-	b.activeProcessorFunc = activeProcessorFunc
+// AddActiveProcessor 添加主动处理器
+func (b *Bot) AddActiveProcessor(activeProcessorFunc ActiveProcessorFunc) {
+	if activeProcessorFunc != nil {
+		b.activeProcessorFunc = append(b.activeProcessorFunc, activeProcessorFunc)
+	}
 }
 
 // Run 运行 bot
+// 只有再拥有 Processor 时才会正常阻塞
 func (b *Bot) Run() error {
 	_, err := b.api.GetMe() // check api
 	if err != nil {
@@ -409,11 +412,15 @@ func (b *Bot) Run() error {
 
 	if (b.webHookEngine) != nil { // 为了和主动处理器行为一致
 		go func() {
+			b.checkTask()
 			if err := b.webHookEngine(); err != nil {
 				b.err <- err
 			}
 		}()
 	} else {
+		if err := b.DeleteWebhook(); err != nil {
+			return err
+		}
 		go b.initiativeEngine()
 	}
 
@@ -437,33 +444,41 @@ func (b *Bot) handleError(err error) {
 	}
 }
 
-// initiativeEngine 核心调度
-func (b *Bot) initiativeEngine() {
-	TotalNumberOfActiveAndPassive := 0
+// checkTask 检查任务再合适的地方结束
+func (b *Bot) checkTask() {
+	totalNumberOfActiveAndPassive := 0
 	cleanActiveAndPassiveCh := make(chan struct{})
-	if b.activeProcessorFunc != nil { // 激活主动处理器
-		TotalNumberOfActiveAndPassive++ // 统计被动
-		go func() {
-			if err := b.activeProcessorFunc(b.api); err != nil {
+	for _, vFn := range b.activeProcessorFunc {
+		totalNumberOfActiveAndPassive++
+		go func(fn ActiveProcessorFunc) {
+			if err := fn(b.api); err != nil {
 				b.handleError(err)
 			}
 			cleanActiveAndPassiveCh <- struct{}{}
-		}()
+		}(vFn)
 	}
 
-	if len(b.commands) != 0 || b.defaultCommand != nil || b.defaultMessageProcessorFunc != nil { // 统计被动
-		TotalNumberOfActiveAndPassive++
+	if len(b.commands) != 0 || b.defaultCommand != nil || b.defaultMessageProcessorFunc != nil || len(b.specifiedTypeMessageProcessorFunc) != 0 { // 统计被动
+		totalNumberOfActiveAndPassive++
 	}
 
 	go func() {
 		num := 0
+		if num >= totalNumberOfActiveAndPassive {
+			b.done <- struct{}{}
+		}
 		for range cleanActiveAndPassiveCh {
 			num++
-			if num >= TotalNumberOfActiveAndPassive {
+			if num >= totalNumberOfActiveAndPassive {
 				b.done <- struct{}{}
 			}
 		}
 	}()
+}
+
+// initiativeEngine 核心调度
+func (b *Bot) initiativeEngine() {
+	b.checkTask()
 
 	for {
 		updates, err := b.api.GetUpdates(b.MsgOffset, 1, b.timeout)
