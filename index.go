@@ -71,7 +71,7 @@ func New(id int, token string, optional *BotOptional) *Bot {
 }
 
 // SetWebhook 设置 webhook
-func (b *Bot) SetWebhook(url string /*API 访问地址*/, address string /*本地监听地址*/, optional *telegram.OptionalWebhook) error {
+func (b *Bot) SetWebhook(url string /*API 访问地址*/, address string /*本地监听地址*/, optional *telegram.WebhookOptional) error {
 	parseURL, err := stdURL.Parse(url)
 	if err != nil {
 		return err
@@ -121,9 +121,9 @@ func (b *Bot) SetWebhook(url string /*API 访问地址*/, address string /*本�
 }
 
 // DeleteWebhook  删除 webhook
-func (b *Bot) DeleteWebhook() error {
+func (b *Bot) DeleteWebhook(optional *telegram.DeleteWebhookOptional) error {
 	b.webHookEngine = nil
-	return b.API.DeleteWebhook()
+	return b.API.DeleteWebhook(optional)
 }
 
 // GetWebhookInfo 获取 webhook 信息
@@ -457,7 +457,7 @@ func (b *Bot) Run() error {
 			}
 		}()
 	} else {
-		if err := b.DeleteWebhook(); err != nil {
+		if err := b.DeleteWebhook(nil); err != nil {
 			return err
 		}
 		go b.initiativeEngine()

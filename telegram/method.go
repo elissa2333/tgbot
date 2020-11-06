@@ -31,13 +31,41 @@ func (a API) GetMe() (*User, error) {
 	return m, err
 }
 
+// LogOut 在本地启动机器人之前，请使用此方法从云Bot API服务器注销。您必须先注销该机器人，然后才能在本地运行该机器人，否则无法保证该机器人将收到更新。成功拨打电话后，您可以立即登录本地服务器，但在10分钟内将无法重新登录到云Bot API服务器。成功返回True。不需要参数。
+// https://core.telegram.org/bots/api#logout
+func (a API) LogOut() (bool, error) {
+	res, err := a.HTTPClient.Post("/logOut")
+	if err != nil {
+		return false, err
+	}
+
+	var m bool
+	err = HandleResp(res, &m)
+	return m, err
+}
+
+// Close 使用此方法关闭bot实例之前，将其从一台本地服务器移至另一台本地服务器。您需要在调用此方法之前删除webhook，以确保在服务器重新启动后不会再次启动该bot。在启动漫游器后的前10分钟，该方法将返回错误429。成功返回True。不需要参数。
+// https://core.telegram.org/bots/api#close
+func (a API) Close() (bool, error) {
+	res, err := a.HTTPClient.Post("/close")
+	if err != nil {
+		return false, err
+	}
+
+	var m bool
+	err = HandleResp(res, &m)
+	return m, err
+}
+
 // SendMessageOptional SendMessage可选参数
 type SendMessageOptional struct {
-	ParseMode             string      `json:"parse_mode,omitempty"`               // 消息文本中的实体解析模式。有关更多详细信息，请参见格式化选项。
-	DisableWebPagePreview bool        `json:"disable_web_page_preview,omitempty"` // 禁用此消息中链接的链接预览
-	DisableNotification   bool        `json:"disable_notification,omitempty"`     // 静默发送消息。用户将收到没有声音的通知。
-	ReplyToMessageID      int64       `json:"reply_to_message_id,omitempty"`      // 如果消息是答复，则为原始消息的ID
-	ReplyMarkup           interface{} `json:"reply_markup,omitempty"`             // 其他界面选项。内联键盘，自定义回复键盘，删除回复键盘或强制用户回复的说明的JSON序列化对象。
+	ParseMode                string          `json:"parse_mode,omitempty"`               // 消息文本中的实体解析模式。有关更多详细信息，请参见格式化选项。
+	Entities                 []MessageEntity `json:"entities"`                           // 出现在消息文本中的特殊实体的列表，可以指定这些实体，而不是parse_mode
+	DisableWebPagePreview    bool            `json:"disable_web_page_preview,omitempty"` // 禁用此消息中链接的链接预览
+	DisableNotification      bool            `json:"disable_notification,omitempty"`     // 静默发送消息。用户将收到没有声音的通知。
+	ReplyToMessageID         int64           `json:"reply_to_message_id,omitempty"`      // 如果消息是答复，则为原始消息的ID
+	AllowSendingWithoutReply bool            `json:"allow_sending_without_reply"`        // 如果未发送指定的回复消息也应发送消息，则传递True
+	ReplyMarkup              interface{}     `json:"reply_markup,omitempty"`             // 其他界面选项。内联键盘，自定义回复键盘，删除回复键盘或强制用户回复的说明的JSON序列化对象。
 }
 
 // SendMessage 发送短信。成功后，将返回发送的消息
@@ -94,6 +122,23 @@ func (a API) ForwardMessage(chatID string /*目标聊天的唯一标识符或目
 	return msg, err
 }
 
+// CopyMessageOptional CopyMessage 可选参数
+type CopyMessageOptional struct {
+	Caption                  string          `json:"caption"`                     // 媒体的新标题，实体解析后为0-1024个字符。如果未指定，则保留原始标题
+	ParseMode                string          `json:"parse_mode"`                  // 在新标题中解析实体的模式。有关更多详细信息，请参见格式化选项。
+	CaptionEntities          []MessageEntity `json:"caption_entities"`            // 出现在新标题中的特殊实体的列表，可以指定这些实体而不是parse_mode
+	DisableNotification      bool            `json:"disable_notification"`        // 静默发送消息。用户将收到没有声音的通知。
+	ReplyToMessageID         int64           `json:"reply_to_message_id"`         // 如果消息是答复，则为原始消息的ID
+	AllowSendingWithoutReply bool            `json:"allow_sending_without_reply"` // 如果未发送指定的回复消息也应发送消息，则传递True
+	ReplyMarkup              interface{}     `json:"reply_markup"`                // 其他界面选项。内联键盘，自定义回复键盘，删除回复键盘或强制用户回复的说明的JSON序列化对象。
+}
+
+// 使用此方法可以复制任何类型的消息。该方法类似于forwardMessages方法，但是复制的消息没有指向原始消息的链接。成功返回已发送消息的MessageId。
+// https://core.telegram.org/bots/api#copymessage
+func (a API) CopyMessage(chatID string, fromChatID string, messageID int64) error { // TODO 未测试
+	return errors.New("TODO")
+}
+
 // handleSendMedia 处理媒体发送
 func (a API) handleSendMedia(uri string, chatID string, fileKey string, file io.Reader, optional interface{}) (*Message, error) {
 
@@ -142,11 +187,13 @@ func (a API) handleSendMedia(uri string, chatID string, fileKey string, file io.
 
 // SendPhotoOptional SendPhoto 可选参数
 type SendPhotoOptional struct {
-	Caption             string      `json:"caption,omitempty"`              // 图片标题（当通过file_id重新发送照片时也可以使用），在实体解析后为0-1024个字符
-	ParseMode           string      `json:"parse_mode,omitempty"`           // 解析照片标题中的实体的模式。有关更多详细信息，请参见格式化选项。
-	DisableNotification bool        `json:"disable_notification,omitempty"` // 静默发送消息。用户将收到没有声音的通知。
-	ReplyToMessageID    int64       `json:"reply_to_message_id,omitempty"`  // 如果消息是答复，则为原始消息的ID
-	ReplyMarkup         interface{} `json:"reply_markup,omitempty"`         // 其他界面选项。内联键盘，自定义回复键盘，删除回复键盘或强制用户回复的说明的JSON序列化对象
+	Caption                  string          `json:"caption,omitempty"`              // 图片标题（当通过file_id重新发送照片时也可以使用），在实体解析后为0-1024个字符
+	ParseMode                string          `json:"parse_mode,omitempty"`           // 解析照片标题中的实体的模式。有关更多详细信息，请参见格式化选项。
+	CaptionEntities          []MessageEntity `json:"caption_entities"`               // 标题中显示的特殊实体的列表，可以指定这些实体，而不是parse_mode
+	DisableNotification      bool            `json:"disable_notification,omitempty"` // 静默发送消息。用户将收到没有声音的通知。
+	ReplyToMessageID         int64           `json:"reply_to_message_id,omitempty"`  // 如果消息是答复，则为原始消息的ID
+	AllowSendingWithoutReply bool            `json:"allow_sending_without_reply"`    // 如果未发送指定的回复消息也应发送消息，则传递True
+	ReplyMarkup              interface{}     `json:"reply_markup,omitempty"`         // 其他界面选项。内联键盘，自定义回复键盘，删除回复键盘或强制用户回复的说明的JSON序列化对象
 }
 
 // SendPhoto 发送照片
@@ -157,15 +204,17 @@ func (a API) SendPhoto(chatID string, photo InputFile, optional *SendPhotoOption
 
 // SendAudioOptional SendAudio可选参数
 type SendAudioOptional struct {
-	Caption             string      `json:"caption,omitempty"`              // 音频字幕，实体解析后0-1024个字符
-	ParseMode           string      `json:"parse_mode,omitempty"`           // 解析音频字幕中实体的模式。有关更多详细信息，请参见格式化选项。
-	Duration            int         `json:"duration,omitempty"`             // 音频持续时间（以秒为单位）
-	Performer           string      `json:"performer,omitempty"`            // 演员
-	Title               string      `json:"title,omitempty"`                // 曲目名称
-	Thumb               InputFile   `json:"thumb,omitempty"`                // 已发送文件的缩略图；如果服务器端支持文件的缩略图生成，则可以忽略。缩略图应为JPEG格式，并且大小应小于200 kB。缩略图的宽度和高度不应超过320。如果未使用multipart / form-data上传文件，则忽略该缩略图。缩略图不能重复使用，只能作为新文件上传，因此如果缩略图是使用<file_attach_name>下的multipart / form-data上传的，则可以传递“ attach：// <file_attach_name>”
-	DisableNotification bool        `json:"disable_notification,omitempty"` // 静默发送消息。用户将收到没有声音的通知。
-	ReplyToMessageID    int         `json:"reply_to_message_id,omitempty"`  // 如果消息是答复，则为原始消息的ID
-	ReplyMarkup         interface{} `json:"reply_markup,omitempty"`         // 其他界面选项。内联键盘，自定义回复键盘，删除回复键盘或强制用户回复的说明的JSON序列化对象。
+	Caption                  string          `json:"caption,omitempty"`              // 音频字幕，实体解析后0-1024个字符
+	ParseMode                string          `json:"parse_mode,omitempty"`           // 解析音频字幕中实体的模式。有关更多详细信息，请参见格式化选项。
+	CaptionEntities          []MessageEntity `json:"caption_entities"`               // 标题中显示的特殊实体的列表，可以指定这些实体，而不是parse_mode
+	Duration                 int             `json:"duration,omitempty"`             // 音频持续时间（以秒为单位）
+	Performer                string          `json:"performer,omitempty"`            // 演员
+	Title                    string          `json:"title,omitempty"`                // 曲目名称
+	Thumb                    InputFile       `json:"thumb,omitempty"`                // 已发送文件的缩略图；如果服务器端支持文件的缩略图生成，则可以忽略。缩略图应为JPEG格式，并且大小应小于200 kB。缩略图的宽度和高度不应超过320。如果未使用multipart / form-data上传文件，则忽略该缩略图。缩略图不能重复使用，只能作为新文件上传，因此如果缩略图是使用<file_attach_name>下的multipart / form-data上传的，则可以传递“ attach：// <file_attach_name>”
+	DisableNotification      bool            `json:"disable_notification,omitempty"` // 静默发送消息。用户将收到没有声音的通知。
+	ReplyToMessageID         int             `json:"reply_to_message_id,omitempty"`  // 如果消息是答复，则为原始消息的ID
+	AllowSendingWithoutReply bool            `json:"allow_sending_without_reply"`    // 如果未发送指定的回复消息也应发送消息，则传递True
+	ReplyMarkup              interface{}     `json:"reply_markup,omitempty"`         // 其他界面选项。内联键盘，自定义回复键盘，删除回复键盘或强制用户回复的说明的JSON序列化对象。
 }
 
 // SendAudio 使用此方法发送音频文件。您的音频必须为.MP3或.M4A格式。成功后，将返回发送的消息。机器人目前最多可以发送50MB的音频文件，以后可能会更改此限制
@@ -176,12 +225,15 @@ func (a API) SendAudio(chatID string, audio InputFile, optional *SendAudioOption
 
 // SendDocumentOptional SendDocument可选参数
 type SendDocumentOptional struct {
-	Thumb               InputFile   `json:"thumb,omitempty"`                // 已发送文件的缩略图；如果服务器端支持文件的缩略图生成，则可以忽略。缩略图应为JPEG格式，并且大小应小于200 kB。缩略图的宽度和高度不应超过320。如果未使用multipart / form-data上传文件，则忽略该缩略图。缩略图不能重复使用，只能作为新文件上传，因此如果缩略图是使用<file_attach_name>下的multipart / form-data上传的，则可以传递“attach://<file_attach_name>”。
-	Caption             string      `json:"caption,omitempty"`              // 文档标题（在通过file_id重新发送文档时也可以使用），实体解析后为0-1024个字符
-	ParseMode           string      `json:"parse_mode,omitempty"`           // 解析文档标题中的实体的模式。有关更多详细信息，请参见格式化选项。
-	DisableNotification bool        `json:"disable_notification,omitempty"` // 静默发送消息。用户将收到没有声音的通知。
-	ReplyToMessageID    int64       `json:"reply_to_message_id,omitempty"`  // 如果消息是答复，则为原始消息的ID
-	ReplyMarkup         interface{} `json:"reply_markup,omitempty"`         // 其他界面选项。内联键盘，自定义回复键盘，删除回复键盘或强制用户回复的说明的JSON序列化对象。
+	Thumb                       InputFile       `json:"thumb,omitempty"`                // 已发送文件的缩略图；如果服务器端支持文件的缩略图生成，则可以忽略。缩略图应为JPEG格式，并且大小应小于200 kB。缩略图的宽度和高度不应超过320。如果未使用multipart / form-data上传文件，则忽略该缩略图。缩略图不能重复使用，只能作为新文件上传，因此如果缩略图是使用<file_attach_name>下的multipart / form-data上传的，则可以传递“attach://<file_attach_name>”。
+	Caption                     string          `json:"caption,omitempty"`              // 文档标题（在通过file_id重新发送文档时也可以使用），实体解析后为0-1024个字符
+	ParseMode                   string          `json:"parse_mode,omitempty"`           // 解析文档标题中的实体的模式。有关更多详细信息，请参见格式化选项。
+	CaptionEntities             []MessageEntity `json:"caption_entities"`               // 标题中显示的特殊实体的列表，可以指定这些实体，而不是parse_mode
+	DisableContentTypeDetection bool            `json:"disable_content_type_detection"` // 对使用 multipart/form-data 上传的文件禁用服务器端内容类型自动检测
+	DisableNotification         bool            `json:"disable_notification,omitempty"` // 静默发送消息。用户将收到没有声音的通知。
+	ReplyToMessageID            int64           `json:"reply_to_message_id,omitempty"`  // 如果消息是答复，则为原始消息的ID
+	AllowSendingWithoutReply    bool            `json:"allow_sending_without_reply"`    // 如果未发送指定的回复消息也应发送消息，则传递True
+	ReplyMarkup                 interface{}     `json:"reply_markup,omitempty"`         // 其他界面选项。内联键盘，自定义回复键盘，删除回复键盘或强制用户回复的说明的JSON序列化对象。
 }
 
 // SendDocument 发送常规文件。成功后，将返回发送的消息。漫游器当前可以发送最大50 MB的任何类型的文件，以后可能会更改此限制。
@@ -192,16 +244,18 @@ func (a API) SendDocument(chatID string, document InputFile, optional *SendDocum
 
 // SendVideoOptional SendVideo可选参数
 type SendVideoOptional struct {
-	Duration            int64       `json:"duration,omitempty"`             // 发送视频的持续时间（以秒为单位）
-	Width               int         `json:"width,omitempty"`                // 影片宽度
-	Height              int         `json:"height,omitempty"`               // 影片高度
-	Thumb               InputFile   `json:"thumb,omitempty"`                // 已发送文件的缩略图；如果服务器端支持文件的缩略图生成，则可以忽略。缩略图应为JPEG格式，并且大小应小于200 kB。缩略图的宽度和高度不应超过320。如果未使用multipart / form-data上传文件，则忽略该缩略图。缩略图不能重复使用，只能作为新文件上传，因此如果缩略图是使用<file_attach_name>下的multipart / form-data上传的，则可以传递“ attach：// <file_attach_name>”
-	Caption             string      `json:"caption,omitempty"`              // 视频标题（当通过file_id重新发送视频时也可以使用），实体解析后为0-1024个字符
-	ParseMode           string      `json:"parse_mode,omitempty"`           // 视频字幕中的实体解析模式。有关更多详细信息，请参见格式化选项。
-	SupportsStreaming   bool        `json:"supports_streaming,omitempty"`   // 如果上传的视频适合流式传输，则通过True
-	DisableNotification bool        `json:"disable_notification,omitempty"` // 静默发送消息。用户将收到没有声音的通知。
-	ReplyToMessageID    int64       `json:"reply_to_message_id,omitempty"`  // 如果消息是答复，则为原始消息的ID
-	ReplyMarkup         interface{} `json:"reply_markup,omitempty"`         // 其他界面选项。内联键盘，自定义回复键盘，删除回复键盘或强制用户回复的说明的JSON序列化对象。
+	Duration                 int64           `json:"duration,omitempty"`             // 发送视频的持续时间（以秒为单位）
+	Width                    int             `json:"width,omitempty"`                // 影片宽度
+	Height                   int             `json:"height,omitempty"`               // 影片高度
+	Thumb                    InputFile       `json:"thumb,omitempty"`                // 已发送文件的缩略图；如果服务器端支持文件的缩略图生成，则可以忽略。缩略图应为JPEG格式，并且大小应小于200 kB。缩略图的宽度和高度不应超过320。如果未使用multipart / form-data上传文件，则忽略该缩略图。缩略图不能重复使用，只能作为新文件上传，因此如果缩略图是使用<file_attach_name>下的multipart / form-data上传的，则可以传递“ attach：// <file_attach_name>”
+	Caption                  string          `json:"caption,omitempty"`              // 视频标题（当通过file_id重新发送视频时也可以使用），实体解析后为0-1024个字符
+	ParseMode                string          `json:"parse_mode,omitempty"`           // 视频字幕中的实体解析模式。有关更多详细信息，请参见格式化选项。
+	CaptionEntities          []MessageEntity `json:"caption_entities"`               // 标题中显示的特殊实体的列表，可以指定这些实体，而不是parse_mode
+	SupportsStreaming        bool            `json:"supports_streaming,omitempty"`   // 如果上传的视频适合流式传输，则通过True
+	DisableNotification      bool            `json:"disable_notification,omitempty"` // 静默发送消息。用户将收到没有声音的通知。
+	ReplyToMessageID         int64           `json:"reply_to_message_id,omitempty"`  // 如果消息是答复，则为原始消息的ID
+	AllowSendingWithoutReply bool            `json:"allow_sending_without_reply"`    // 如果未发送指定的回复消息也应发送消息，则传递True
+	ReplyMarkup              interface{}     `json:"reply_markup,omitempty"`         // 其他界面选项。内联键盘，自定义回复键盘，删除回复键盘或强制用户回复的说明的JSON序列化对象。
 }
 
 // SendVideo 发送视频文件，Telegram客户端支持mp4视频（其他格式也可以作为Document发送）。成功后，将返回发送的消息。机器人目前最多可以发送50MB的视频文件，以后可能会更改此限制
@@ -212,15 +266,17 @@ func (a API) SendVideo(chatID string, video InputFile, optional *SendVideoOption
 
 // SendAnimationOptional SendAnimation可选参数
 type SendAnimationOptional struct {
-	Duration            int64       `json:"duration,omitempty"`             // 发送动画的持续时间（以秒为单位）
-	Width               int         `json:"width,omitempty"`                // 动画宽度
-	Height              int         `json:"height,omitempty"`               // 动画高度
-	Thumb               InputFile   `json:"thumb,omitempty"`                // 已发送文件的缩略图；如果服务器端支持文件的缩略图生成，则可以忽略。缩略图应为JPEG格式，并且大小应小于200 kB。缩略图的宽度和高度不应超过320。如果未使用multipart / form-data上传文件，则忽略该缩略图。缩略图不能重复使用，只能作为新文件上传，因此如果缩略图是使用<file_attach_name>下的multipart / form-data上传的，则可以传递“ attach：// <file_attach_name>”
-	Caption             string      `json:"caption,omitempty"`              // 动画标题（当通过file_id重新发送动画时也可以使用），在实体解析后为0-1024个字符
-	ParseMode           string      `json:"parse_mode,omitempty"`           // 解析动画标题中实体的模式。有关更多详细信息，请参见格式化选项。
-	DisableNotification bool        `json:"disable_notification,omitempty"` // 静默发送消息。用户将收到没有声音的通知。
-	ReplyToMessageID    int64       `json:"reply_to_message_id,omitempty"`  // 如果消息是答复，则为原始消息的ID
-	ReplyMarkup         interface{} `json:"reply_markup,omitempty"`         // 其他界面选项。内联键盘，自定义回复键盘，删除回复键盘或强制用户回复的说明的JSON序列化对象。
+	Duration                 int64           `json:"duration,omitempty"`             // 发送动画的持续时间（以秒为单位）
+	Width                    int             `json:"width,omitempty"`                // 动画宽度
+	Height                   int             `json:"height,omitempty"`               // 动画高度
+	Thumb                    InputFile       `json:"thumb,omitempty"`                // 已发送文件的缩略图；如果服务器端支持文件的缩略图生成，则可以忽略。缩略图应为JPEG格式，并且大小应小于200 kB。缩略图的宽度和高度不应超过320。如果未使用multipart / form-data上传文件，则忽略该缩略图。缩略图不能重复使用，只能作为新文件上传，因此如果缩略图是使用<file_attach_name>下的multipart / form-data上传的，则可以传递“ attach：// <file_attach_name>”
+	Caption                  string          `json:"caption,omitempty"`              // 动画标题（当通过file_id重新发送动画时也可以使用），在实体解析后为0-1024个字符
+	ParseMode                string          `json:"parse_mode,omitempty"`           // 解析动画标题中实体的模式。有关更多详细信息，请参见格式化选项。
+	CaptionEntities          []MessageEntity `json:"caption_entities"`               // 标题中显示的特殊实体的列表，可以指定这些实体，而不是parse_mode
+	DisableNotification      bool            `json:"disable_notification,omitempty"` // 静默发送消息。用户将收到没有声音的通知。
+	ReplyToMessageID         int64           `json:"reply_to_message_id,omitempty"`  // 如果消息是答复，则为原始消息的ID
+	AllowSendingWithoutReply bool            `json:"allow_sending_without_reply"`    // 如果未发送指定的回复消息也应发送消息，则传递True
+	ReplyMarkup              interface{}     `json:"reply_markup,omitempty"`         // 其他界面选项。内联键盘，自定义回复键盘，删除回复键盘或强制用户回复的说明的JSON序列化对象。
 }
 
 // SendAnimation 发送动画文件（无声音的GIF或H.264/MPEG-4 AVC视频）。成功后，将返回发送的消息。机器人目前最多可以发送50MB的动画文件，以后可能会更改此限制。
@@ -231,12 +287,14 @@ func (a API) SendAnimation(chatID string, animation InputFile, optional *SendAni
 
 // SendVoiceOptional SendVoice可选参数
 type SendVoiceOptional struct {
-	Caption             string      `json:"caption,omitempty"`              // 语音消息标题，实体解析后0-1024个字符
-	ParseMode           string      `json:"parse_mode,omitempty"`           // 语音消息标题中的实体解析模式。有关更多详细信息，请参见格式化选项。
-	Duration            int64       `json:"duration,omitempty"`             // 语音留言的持续时间（以秒为单位）
-	DisableNotification bool        `json:"disable_notification,omitempty"` // 静默发送消息。用户将收到没有声音的通知。
-	ReplyToMessageID    int64       `json:"reply_to_message_id,omitempty"`  // 如果消息是答复，则为原始消息的ID
-	ReplyMarkup         interface{} `json:"reply_markup,omitempty"`         // 其他界面选项。内联键盘，自定义回复键盘，删除回复键盘或强制用户回复的说明的JSON序列化对象。
+	Caption                  string          `json:"caption,omitempty"`              // 语音消息标题，实体解析后0-1024个字符
+	ParseMode                string          `json:"parse_mode,omitempty"`           // 语音消息标题中的实体解析模式。有关更多详细信息，请参见格式化选项。
+	CaptionEntities          []MessageEntity `json:"caption_entities"`               // 标题中显示的特殊实体的列表，可以指定这些实体，而不是parse_mode
+	Duration                 int64           `json:"duration,omitempty"`             // 语音留言的持续时间（以秒为单位）
+	DisableNotification      bool            `json:"disable_notification,omitempty"` // 静默发送消息。用户将收到没有声音的通知。
+	ReplyToMessageID         int64           `json:"reply_to_message_id,omitempty"`  // 如果消息是答复，则为原始消息的ID
+	AllowSendingWithoutReply bool            `json:"allow_sending_without_reply"`    // 如果未发送指定的回复消息也应发送消息，则传递True
+	ReplyMarkup              interface{}     `json:"reply_markup,omitempty"`         // 其他界面选项。内联键盘，自定义回复键盘，删除回复键盘或强制用户回复的说明的JSON序列化对象。
 }
 
 // SendVoice 如果希望Telegram客户端将文件显示为可播放的语音消息，请使用此方法发送音频文件。为此，您的音频必须是使用OPUS编码的.OGG文件（其他格式可能以Audio或Document的形式发送）。成功后，将返回发送的消息。漫游器当前可以发送最大50 MB的语音消息，将来可能会更改此限制。
@@ -247,12 +305,13 @@ func (a API) SendVoice(chatID string, voice InputFile, optional *SendVoiceOption
 
 // OptionalVideoNoteOptional SendVideoNote可选参数
 type OptionalVideoNoteOptional struct {
-	Duration            int64       `json:"duration,omitempty"`             // 发送视频的持续时间（以秒为单位）
-	Length              int         `json:"length,omitempty"`               // 视频宽度和高度，即视频消息的直径
-	Thumb               InputFile   `json:"thumb,omitempty"`                // 已发送文件的缩略图；如果服务器端支持文件的缩略图生成，则可以忽略。缩略图应为JPEG格式，并且大小应小于200 kB。缩略图的宽度和高度不应超过320。如果未使用multipart / form-data上传文件，则忽略该缩略图。缩略图不能重复使用，只能作为新文件上传，因此如果缩略图是使用<file_attach_name>下的multipart / form-data上传的，则可以传递“ attach：// <file_attach_name>”
-	DisableNotification bool        `json:"disable_notification,omitempty"` // 静默发送消息。用户将收到没有声音的通知。
-	ReplyToMessageID    int64       `json:"reply_to_message_id,omitempty"`  // 如果消息是答复，则为原始消息的ID
-	ReplyMarkup         interface{} `json:"reply_markup,omitempty"`         // 其他界面选项。内联键盘，自定义回复键盘，删除回复键盘或强制用户回复的说明的JSON序列化对象。
+	Duration                 int64       `json:"duration,omitempty"`             // 发送视频的持续时间（以秒为单位）
+	Length                   int         `json:"length,omitempty"`               // 视频宽度和高度，即视频消息的直径
+	Thumb                    InputFile   `json:"thumb,omitempty"`                // 已发送文件的缩略图；如果服务器端支持文件的缩略图生成，则可以忽略。缩略图应为JPEG格式，并且大小应小于200 kB。缩略图的宽度和高度不应超过320。如果未使用multipart / form-data上传文件，则忽略该缩略图。缩略图不能重复使用，只能作为新文件上传，因此如果缩略图是使用<file_attach_name>下的multipart / form-data上传的，则可以传递“ attach：// <file_attach_name>”
+	DisableNotification      bool        `json:"disable_notification,omitempty"` // 静默发送消息。用户将收到没有声音的通知。
+	ReplyToMessageID         int64       `json:"reply_to_message_id,omitempty"`  // 如果消息是答复，则为原始消息的ID
+	AllowSendingWithoutReply bool        `json:"allow_sending_without_reply"`    // 如果未发送指定的回复消息也应发送消息，则传递True
+	ReplyMarkup              interface{} `json:"reply_markup,omitempty"`         // 其他界面选项。内联键盘，自定义回复键盘，删除回复键盘或强制用户回复的说明的JSON序列化对象。
 }
 
 // SendVideoNote 从v.4.0开始，Telegram客户端支持最长1分钟的圆形mp4方形视频。使用此方法发送视频消息。
@@ -263,26 +322,29 @@ func (a API) SendVideoNote(chatID string, videoNote InputFile, optional *Optiona
 
 // SendMediaGroupOptional SendMediaGroup 可选参数
 type SendMediaGroupOptional struct {
-	DisableNotification bool  `json:"disable_notification,omitempty"` // 静默发送消息。用户将收到没有声音的通知。
-	ReplyToMessageID    int64 `json:"reply_to_message_id,omitempty"`  // 如果消息是答复，则为原始消息的ID
+	DisableNotification      bool  `json:"disable_notification,omitempty"` // 静默发送消息。用户将收到没有声音的通知。
+	ReplyToMessageID         int64 `json:"reply_to_message_id,omitempty"`  // 如果消息是答复，则为原始消息的ID
+	AllowSendingWithoutReply bool  `json:"allow_sending_without_reply"`    // 如果未发送指定的回复消息也应发送消息，则传递True
 }
 
 //SendMediaGroup 将一组照片或视频作为相册发送。成功后，将返回已发送消息的数组。
 // https://core.telegram.org/bots/api#sendmediagroup
-func (a API) SendMediaGroup(chatID string, media InputFile, optional *SendMediaGroupOptional) (*Message, error) { // TODO media 处理有问题 返回的输数组
-	return a.handleSendMedia("/sendMediaGroup", chatID, "media", media, optional)
+func (a API) SendMediaGroup(chatID string, media interface{} /*Array of InputMediaAudio, InputMediaDocument, InputMediaPhoto and InputMediaVideo*/, optional *SendMediaGroupOptional) (*Message, error) { // TODO media 未测试
+	//return a.handleSendMedia("/sendMediaGroup", chatID, "media", media, optional)
+
+	return nil, errors.New("TODO")
 }
 
 // SendLocationOptional sendLocation 可选参数
 type SendLocationOptional struct {
-	LivePeriod          int64       `json:"live_period,omitempty"`          // 位置将被更新的秒数（请参阅实时位置，应在60到86400之间）。
-	DisableNotification bool        `json:"disable_notification,omitempty"` // 静默发送消息。用户将收到没有声音的通知。
-	ReplyToMessageID    int64       `json:"reply_to_message_id,omitempty"`  // 如果消息是答复，则为原始消息的ID
-	ReplyMarkup         interface{} `json:"reply_markup,omitempty"`         // 其他界面选项。内联键盘，自定义回复键盘，删除回复键盘或强制用户回复的说明的JSON序列化对象。
-
+	HorizontalAccuracy   float64     `json:"horizontal_accuracy"`            // 位置的不确定性半径，以米为单位；0-1500
+	LivePeriod           int64       `json:"live_period,omitempty"`          // 位置将被更新的秒数（请参阅实时位置，应在60到86400之间）。
+	Heading              int64       `json:"heading"`                        // 对于现场位置，用户移动的方向（以度为单位）。如果指定，则必须介于1到360之间。
+	ProximityAlertRadius int64       `json:"proximity_alert_radius"`         // 对于实时位置，有关接近另一个聊天成员的接近警报的最大距离（以米为单位）。如果指定，则必须介于1到100000之间。
+	DisableNotification  bool        `json:"disable_notification,omitempty"` // 静默发送消息。用户将收到没有声音的通知。
+	ReplyToMessageID     int64       `json:"reply_to_message_id,omitempty"`  // 如果消息是答复，则为原始消息的ID
+	ReplyMarkup          interface{} `json:"reply_markup,omitempty"`         // 其他界面选项。内联键盘，自定义回复键盘，删除回复键盘或强制用户回复的说明的JSON序列化对象。
 }
-
-// TODO 合并同类项
 
 // SendLocation 在地图上发送点。成功后，将返回发送的消息。
 // https://core.telegram.org/bots/api#sendlocation
@@ -310,10 +372,13 @@ func (a API) SendLocation(chatID string, latitude float64, longitude float64, op
 
 // EditMessageLiveLocationOptional EditMessageLiveLocation 可选参数
 type EditMessageLiveLocationOptional struct {
-	ChatID          string                `json:"chat_id,omitempty"`           // 如果未指定inline_message_id，则为必需。目标聊天的唯一标识符或目标频道的用户名（格式为@channelusername）
-	MessageID       int64                 `json:"message_id,omitempty"`        // 如果未指定inline_message_id，则为必需。要编辑的消息的标识符
-	InlineMessageID string                `json:"inline_message_id,omitempty"` // 如果未指定chat_id和message_id，则为必需。内联消息的标识符
-	ReplyMarkup     *InlineKeyboardMarkup `json:"reply_markup,omitempty"`      // 用于新的嵌入式键盘的JSON序列化对象。
+	ChatID               string                `json:"chat_id,omitempty"`           // 如果未指定inline_message_id，则为必需。目标聊天的唯一标识符或目标频道的用户名（格式为@channelusername）
+	MessageID            int64                 `json:"message_id,omitempty"`        // 如果未指定inline_message_id，则为必需。要编辑的消息的标识符
+	InlineMessageID      string                `json:"inline_message_id,omitempty"` // 如果未指定chat_id和message_id，则为必需。内联消息的标识符
+	HorizontalAccuracy   float64               `json:"horizontal_accuracy"`         // 位置的不确定性半径，以米为单位；0-1500
+	Heading              int64                 `json:"heading"`                     // 用户移动的方向（以度为单位）。如果指定，则必须介于1到360之间。
+	ProximityAlertRadius int64                 `json:"proximity_alert_radius"`      // 有关接近另一个聊天成员的接近警报的最大距离（以米为单位）。如果指定，则必须介于1到100000之间。
+	ReplyMarkup          *InlineKeyboardMarkup `json:"reply_markup,omitempty"`      // 用于新的嵌入式键盘的JSON序列化对象。
 }
 
 // EditMessageLiveLocation 编辑实时位置消息。可以编辑位置，直到其live_period到期，或者通过调用stopMessageLiveLocation显式禁用编辑。成功后，如果已编辑的消息是由bot发送的，则返回已编辑的消息，否则返回True
@@ -372,11 +437,14 @@ func (a API) StopMessageLiveLocation(optional *StopMessageLiveLocationOptional) 
 
 // SendVenueOptional SendVenue 可选参数
 type SendVenueOptional struct {
-	FoursquareID        string `json:"foursquare_id,omitempty"`        // 场地的Foursquare标识符
-	FoursquareType      string `json:"foursquare_type,omitempty"`      // 场地的Foursquare类型（如果已知）。（例如，“ arts_entertainment /默认”，“ arts_entertainment /水族馆”或“食品/冰淇淋”。）
-	DisableNotification string `json:"disable_notification,omitempty"` // 静默发送消息。用户将收到没有声音的通知。
-	ReplyToMessageID    int64  `json:"reply_to_message_id,omitempty"`  // 如果消息是答复，则为原始消息的ID
-	ReplyMarkup         int64  `json:"reply_markup,omitempty"`         // 其他界面选项。内联键盘，自定义回复键盘，删除回复键盘或强制用户回复的说明的JSON序列化对象。
+	FoursquareID             string `json:"foursquare_id,omitempty"`        // 场地的Foursquare标识符
+	FoursquareType           string `json:"foursquare_type,omitempty"`      // 场地的Foursquare类型（如果已知）。（例如，“ arts_entertainment /默认”，“ arts_entertainment /水族馆”或“食品/冰淇淋”。）
+	GooglePlaceID            string `json:"google_place_id"`                // 场地的Google地方信息标识符
+	GooglePlaceType          string `json:"google_place_type"`              // 场所的Google地方信息类型。（请参阅支持的类型。）
+	DisableNotification      string `json:"disable_notification,omitempty"` // 静默发送消息。用户将收到没有声音的通知。
+	ReplyToMessageID         int64  `json:"reply_to_message_id,omitempty"`  // 如果消息是答复，则为原始消息的ID
+	AllowSendingWithoutReply bool   `json:"allow_sending_without_reply"`    // 如果未发送指定的回复消息也应发送消息，则传递True
+	ReplyMarkup              int64  `json:"reply_markup,omitempty"`         // 其他界面选项。内联键盘，自定义回复键盘，删除回复键盘或强制用户回复的说明的JSON序列化对象。
 }
 
 // SendVenue 发送有关场地的信息。成功后，将返回发送的消息。
@@ -406,11 +474,12 @@ func (a API) SendVenue(chatID string, latitude float64, longitude float64, title
 
 // SendContactOptional SendContact 可选参数
 type SendContactOptional struct {
-	LastName            string      `json:"last_name,omitempty"`            // 联系人的姓氏
-	Vcard               string      `json:"vcard,omitempty"`                // 有关vCard形式的联系人的其他数据，0-2048字节
-	DisableNotification bool        `json:"disable_notification,omitempty"` // 静默发送消息。用户将收到没有声音的通知
-	ReplyToMessageID    int64       `json:"reply_to_message_id,omitempty"`  // 如果消息是答复，则为原始消息的ID
-	ReplyMarkup         interface{} `json:"reply_markup,omitempty"`         // 其他界面选项。内联键盘，自定义回复键盘，删除键盘或强制用户回复的说明的JSON序列化对象。
+	LastName                 string      `json:"last_name,omitempty"`            // 联系人的姓氏
+	Vcard                    string      `json:"vcard,omitempty"`                // 有关vCard形式的联系人的其他数据，0-2048字节
+	DisableNotification      bool        `json:"disable_notification,omitempty"` // 静默发送消息。用户将收到没有声音的通知
+	ReplyToMessageID         int64       `json:"reply_to_message_id,omitempty"`  // 如果消息是答复，则为原始消息的ID
+	AllowSendingWithoutReply bool        `json:"allow_sending_without_reply"`    // 如果未发送指定的回复消息也应发送消息，则传递True
+	ReplyMarkup              interface{} `json:"reply_markup,omitempty"`         // 其他界面选项。内联键盘，自定义回复键盘，删除键盘或强制用户回复的说明的JSON序列化对象。
 }
 
 // SendContact 发送电话联系人。成功后，将返回发送的消息。
@@ -440,21 +509,22 @@ func (a API) SendContact(chatID string, phoneNumber string, firstName string, op
 
 // SendPollOptional SendPoll 可选参数
 type SendPollOptional struct {
-	IsAnonymous           bool        `json:"is_anonymous,omitempty"`            // 如果轮询需要匿名，则默认为True
-	Type                  string      `json:"type,omitempty"`                    // 投票类型，“测验”或“常规”，默认为“常规”
-	AllowsMultipleAnswers bool        `json:"allows_multiple_answers,omitempty"` // 正确，如果轮询允许多个答案，则在测验模式下被轮询忽略，默认为False
-	CorrectOptionID       int64       `json:"correct_option_id,omitempty"`       // 测验模式下的轮询所需的基于0的正确答案选项的标识符
-	Explanation           string      `json:"explanation,omitempty"`             // 当用户选择错误的答案或轻按测验样式的民意测验中的灯泡图标时显示的文本，实体解析后最多0至200个字符，最多2个换行
-	ExplanationParseMode  string      `json:"explanation_parse_mode,omitempty"`  // 解释中的实体解析模式。有关更多详细信息，请参见格式化选项。
-	OpenPeriod            int64       `json:"open_period,omitempty"`             // 创建后轮询将在5-600秒钟内激活的时间（以秒为单位）。不能与close_date一起使用。
-	CloseDate             int64       `json:"close_date,omitempty"`              // 轮询将自动关闭的时间点（Unix时间戳）。将来必须至少为5秒且不超过600秒。不能与open_period一起使用。
-	DisableNotification   bool        `json:"disable_notification,omitempty"`    // 静默发送消息。用户将收到没有声音的通知。
-	ReplyToMessageID      int64       `json:"reply_to_message_id,omitempty"`     // 如果消息是答复，则为原始消息的ID
-	ReplyMarkup           interface{} `json:"reply_markup,omitempty"`            // 其他界面选项。内联键盘，自定义回复键盘，删除回复键盘或强制用户回复的说明的JSON序列化对象。
+	IsAnonymous              bool        `json:"is_anonymous,omitempty"`            // 如果轮询需要匿名，则默认为True
+	Type                     string      `json:"type,omitempty"`                    // 投票类型，“测验”或“常规”，默认为“常规”
+	AllowsMultipleAnswers    bool        `json:"allows_multiple_answers,omitempty"` // 正确，如果轮询允许多个答案，则在测验模式下被轮询忽略，默认为False
+	CorrectOptionID          int64       `json:"correct_option_id,omitempty"`       // 测验模式下的轮询所需的基于0的正确答案选项的标识符
+	Explanation              string      `json:"explanation,omitempty"`             // 当用户选择错误的答案或轻按测验样式的民意测验中的灯泡图标时显示的文本，实体解析后最多0至200个字符，最多2个换行
+	ExplanationParseMode     string      `json:"explanation_parse_mode,omitempty"`  // 解释中的实体解析模式。有关更多详细信息，请参见格式化选项。
+	OpenPeriod               int64       `json:"open_period,omitempty"`             // 创建后轮询将在5-600秒钟内激活的时间（以秒为单位）。不能与close_date一起使用。
+	CloseDate                int64       `json:"close_date,omitempty"`              // 轮询将自动关闭的时间点（Unix时间戳）。将来必须至少为5秒且不超过600秒。不能与open_period一起使用。
+	DisableNotification      bool        `json:"disable_notification,omitempty"`    // 静默发送消息。用户将收到没有声音的通知。
+	ReplyToMessageID         int64       `json:"reply_to_message_id,omitempty"`     // 如果消息是答复，则为原始消息的ID
+	AllowSendingWithoutReply bool        `json:"allow_sending_without_reply"`       // 如果未发送指定的回复消息也应发送消息，则传递True
+	ReplyMarkup              interface{} `json:"reply_markup,omitempty"`            // 其他界面选项。内联键盘，自定义回复键盘，删除回复键盘或强制用户回复的说明的JSON序列化对象。
 }
 
 // SendPoll 发送本机轮询。成功后，将返回发送的消息。
-// https://core.telegram.org/APIs/api#sendpoll
+// https://core.telegram.org/bots/api#sendpoll
 func (a API) SendPoll(chatID string, question string, options []string, optional *PollOption) (*Message, error) {
 	m := map[string]interface{}{"chat_id": chatID, "question": question}
 	if optional != nil {
@@ -479,10 +549,11 @@ func (a API) SendPoll(chatID string, question string, options []string, optional
 
 // SendDiceOptional SendDice 可选参数
 type SendDiceOptional struct {
-	Emoji               string      `json:"emoji,omitempty"`                // 掷骰子动画所基于的表情符号。当前，必须是“ 🎲”，“ 🎯”或“ 🏀”之一。骰子的“ 🎲”和“ 🎯” 值可以为1-6，“ ”的值为1-5 🏀。默认为“ 🎲”
-	DisableNotification bool        `json:"disable_notification,omitempty"` // 静默发送消息。用户将收到没有声音的通知。
-	ReplyToMessageID    int64       `json:"reply_to_message_id,omitempty"`  // 如果消息是答复，则为原始消息的ID
-	ReplyMarkup         interface{} `json:"reply_markup,omitempty"`         // 其他界面选项。内联键盘，自定义回复键盘，删除回复键盘或强制用户回复的说明的JSON序列化对象。
+	Emoji                    string      `json:"emoji,omitempty"`                // 掷骰子动画所基于的表情符号。当前，必须是“ 🎲”，“ 🎯”，“ 🏀”，“ ⚽”或“ 🎰”之一。骰子的“ 🎲”和“ 🎯”值可以为1-6，“ ”和“ ”的值可以为1-5，“ 🏀”的⚽值可以为1-64 🎰。默认为“ 🎲”
+	DisableNotification      bool        `json:"disable_notification,omitempty"` // 静默发送消息。用户将收到没有声音的通知。
+	ReplyToMessageID         int64       `json:"reply_to_message_id,omitempty"`  // 如果消息是答复，则为原始消息的ID
+	AllowSendingWithoutReply bool        `json:"allow_sending_without_reply"`    // 如果未发送指定的回复消息也应发送消息，则传递True
+	ReplyMarkup              interface{} `json:"reply_markup,omitempty"`         // 其他界面选项。内联键盘，自定义回复键盘，删除回复键盘或强制用户回复的说明的JSON序列化对象。
 }
 
 // SendDice 发送动画的表情符号，它将显示随机值。成功后，将返回发送的消息。
@@ -622,11 +693,15 @@ func (a API) KickChatMember(chatID string, userID int64, optional *KickChatMembe
 	return result, err
 }
 
+type UnbanChatMemberOptional struct {
+	OnlyIfBanned bool `json:"only_if_banned"` // 如果不禁止用户，则不执行任何操作
+}
+
 // UnbanChatMember 取消超级组或频道中以前被踢过的用户的权限。用户将不会自动返回到组或频道，但将能够通过链接等加入。bot必须是管理员才能起作用。
 // https://core.telegram.org/bots/api#unbanchatmember
-func (a API) UnbanChatMember(chatID string, userID string) (bool, error) {
+func (a API) UnbanChatMember(chatID string, userID string, optional *UnbanChatMemberOptional) (bool, error) {
 	var result bool
-	err := a.handleOptional("/unbanChatMember", map[string]interface{}{"chat_id": chatID, "user_id": userID}, nil, result)
+	err := a.handleOptional("/unbanChatMember", map[string]interface{}{"chat_id": chatID, "user_id": userID}, optional, &result)
 	return result, err
 }
 
@@ -787,18 +862,24 @@ func (a API) PinChatMessage(chatID string, messageID string, optional PinChatMes
 	return result, err
 }
 
-// UnpinChatMessage 使用此方法可以取消固定组，超组或通道中的消息。该bot必须是聊天中的管理员才能正常工作，并且必须在超级组中具有“ can_pin_messages”管理员权限，或在该频道中具有“ can_edit_messages”管理员权限。
+// UnpinChatMessageOptional UnpinChatMessage 可选参数
+type UnpinChatMessageOptional struct {
+	MessageID int64 `json:"message_id"` // 要取消固定的消息的标识符。如果未指定，最新的固定消息（按发送日期）将被取消固定。
+}
+
+// UnpinChatMessage 使用此方法可以取消固定组，超组或通道中的消息。该bot必须是聊天中的管理员才能正常工作，并且必须在超级组中具有“can_pin_messages”管理员权限，或在该频道中具有“can_edit_messages”管理员权限。
 // https://core.telegram.org/bots/api#unpinchatmessage
-func (a API) UnpinChatMessage(chatID string) (bool, error) {
-	res, err := a.HTTPClient.SetBody(map[string]interface{}{"chat_id": chatID}).Post("/unpinChatMessage")
-	if err != nil {
-		return false, err
-	}
-	defer res.Body.Close()
-
+func (a API) UnpinChatMessage(chatID string, optional *UnpinChatMessageOptional) (bool, error) {
 	var result bool
-	err = HandleResp(res, &result)
+	err := a.handleOptional("/unpinChatMessage", map[string]interface{}{"chat_id": chatID}, optional, &result)
+	return result, err
+}
 
+// 使用此方法可以清除聊天中的固定消息列表。如果该聊天不是私人聊天，则该bot必须是该聊天的管理员才能正常工作，并且必须在超级组中具有“can_pin_messages”管理员权限，或者在一个频道中必须具有“can_edit_messages”管理员权限。成功返回True。
+// https://core.telegram.org/bots/api#unpinallchatmessages
+func (a API) UnpinAllChatMessages(chatID string) (bool, error) {
+	var result bool
+	err := a.handleOptional("/unpinAllChatMessages", map[string]interface{}{"chat_id": chatID}, nil, &result)
 	return result, err
 }
 

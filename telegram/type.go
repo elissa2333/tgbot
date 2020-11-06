@@ -44,6 +44,7 @@ type Chat struct {
 	FirstName        string           `json:"first_name,omitempty"`          // 可选的。私人聊天中对方的名字
 	LastName         string           `json:"last_name,omitempty"`           // 可选的。私人聊天中对方的姓氏
 	Photo            *ChatPhoto       `json:"photo,omitempty"`               // 可选的。聊天照片。仅在 GetChat 中返回。
+	Bio              string           `json:"bio"`                           // 可选的。私人聊天中对方的个人简介。仅在getChat中返回。
 	Description      string           `json:"description,omitempty"`         // 可选的。说明，用于群组，超群组和频道聊天。仅在 GetChat 中返回。
 	InviteLink       string           `json:"invite_link,omitempty"`         // 可选的。聊天邀请链接，用于群组，超级群组和频道聊天。聊天中的每个管理员都会生成自己的邀请链接，因此bot必须首先使用exportChatInviteLink生成链接。仅在 GetChat 中返回。
 	PinnedMessage    *Message         `json:"pinned_message,omitempty"`      // 可选的。固定消息，用于组，超组和通道。仅在 GetChat 中返回。
@@ -51,60 +52,64 @@ type Chat struct {
 	SlowModeDelay    int64            `json:"slow_mode_delay,omitempty"`     // 可选的。对于超组，每个非特权用户发送的连续消息之间允许的最小延迟。仅在 GetChat 中返回。
 	StickerSetName   string           `json:"sticker_set_name,omitempty"`    // 可选的。对于超组，请使用组贴纸集的名称。仅在 GetChat 中返回。
 	CanSetStickerSet bool             `json:"can_set_sticker_set,omitempty"` // 可选的。是的，如果漫游器可以更改组标签集。仅在 GetChat 中返回。
+	LinkedChatID     int64            `json:"linked_chat_id"`                // 可选的。链接聊天的唯一标识符，即频道的讨论组标识符，反之亦然；用于超级群组和频道聊天。该标识符可能大于32位，并且某些编程语言在解释它时可能会有困难/无声的缺陷。但是它小于52位，因此带符号的64位整数或双精度浮点类型对于存储此标识符是安全的。仅在getChat中返回。
+	Location         *ChatLocation    `json:"location"`                      // 可选的。对于超组，是超组连接到的位置。仅在getChat中返回。
 }
 
 // Message 一条消息
 // https://core.telegram.org/bots/api#message
 type Message struct {
-	MessageID             int64                 `json:"message_id,omitempty"`              // 此聊天中的唯一消息标识符
-	From                  *User                 `json:"from,omitempty"`                    // 可选的。发件人，对于发送到渠道的消息为空
-	Data                  int64                 `json:"data,omitempty"`                    // 消息在Unix时间中发送的日期
-	Chat                  *Chat                 `json:"chat,omitempty"`                    // 消息所属的会话
-	ForwardFrom           *User                 `json:"forward_from,omitempty"`            // 可选的。对于转发的邮件，原始邮件的发件人
-	ForwardFromChat       *Chat                 `json:"forward_from_chat,omitempty"`       // 可选的。对于从频道转发的消息，有关原始频道的信息
-	ForwardFromMessageID  int64                 `json:"forward_from_message_id,omitempty"` // 可选的。对于从通道转发的消息，是通道中原始消息的标识符
-	ForwardSignature      string                `json:"forward_signature,omitempty"`       // 可选的。对于从频道转发的消息，请提供帖子作者的签名（如果有）
-	ForwardSenderName     string                `json:"forward_sender_name,omitempty"`     // 可选的。从用户转发的邮件的发件人名称，这些用户不允许在转发的邮件中添加指向其帐户的链接
-	ForwardDate           int64                 `json:"forward_date,omitempty"`            // 可选的。对于转发的消息，原始消息的发送日期为Unix时间
-	ReplyToMessage        *Message              `json:"reply_to_message,omitempty"`        // 可选的。对于答复，原始消息。请注意，即使此字段本身是答复，该字段中的 Message 对象也不会包含其他的reply_to_message字段。
-	ViaBot                *User                 `json:"via_bot,omitempty"`                 // 可选的。发送消息的机器人
-	EditDate              int64                 `json:"edit_date,omitempty"`               // 可选的。消息最后一次在Unix时间中编辑的日期
-	MediaGroupID          string                `json:"media_group_id,omitempty"`          // 可选的。该消息所属的媒体消息组的唯一标识符
-	AuthorSignature       string                `json:"author_signature,omitempty"`        // 可选的。在频道中留言的帖子作者的签名
-	Text                  string                `json:"text,omitempty"`                    // 可选的。对于文本消息，消息的实际UTF-8文本，0-4096个字符
-	Entities              []MessageEntity       `json:"entities,omitempty"`                // 可选的。对于文本消息，出现在文本中的特殊实体，例如用户名，URL，机器人命令等。
-	Animation             *Animation            `json:"animation,omitempty"`               // 可选的。消息是动画，有关动画的信息。为了向后兼容，设置此字段时，还将设置文档字段
-	Audio                 *Audio                `json:"audio,omitempty"`                   // 可选的。消息是音频文件，有关该文件的信息
-	Document              *Document             `json:"document,omitempty"`                // 可选的。消息是常规文件，有关文件的信息
-	Photo                 []PhotoSize           `json:"photo,omitempty"`                   // 可选的。邮件是照片，照片的可用尺寸
-	Sticker               *Sticker              `json:"sticker,omitempty"`                 // 可选的。消息是贴纸，有关贴纸的信息
-	Video                 *Video                `json:"video,omitempty"`                   // 可选的。消息是视频，有关视频的信息
-	VideoNote             *VideoNote            `json:"video_note,omitempty"`              // 可选的。留言是视频笔记，有关视频留言的信息
-	Voice                 *Voice                `json:"voice,omitempty"`                   // 可选的。消息是语音消息，有关文件的信息
-	Caption               string                `json:"caption,omitempty"`                 // 可选的。动画，音频，文档，照片，视频或语音的标题，0-1024个字符
-	CaptionEntities       []MessageEntity       `json:"caption_entities,omitempty"`        // 可选的。对于带标题的邮件，出现在标题中的特殊实体，例如用户名，URL，漫游器命令等。
-	Contact               *Contact              `json:"contact,omitempty"`                 // 可选的。消息是共享的联系人，有关该联系人的信息
-	Dice                  *Dice                 `json:"dice,omitempty"`                    // 可选的。消息是一个骰子，具有从1到6的随机值
-	Game                  *Game                 `json:"game,omitempty"`                    // 可选的。消息是一个游戏，有关游戏的信息
-	Poll                  *Poll                 `json:"poll,omitempty"`                    // 可选的。消息是本机民意测验，有关民意测验的信息
-	Venue                 *Venue                `json:"venue,omitempty"`                   // 可选的。消息是一个场地，有关该场地的信息。为了向后兼容，设置此字段时，还将设置位置字段
-	Location              *Location             `json:"location,omitempty"`                // 可选的。消息是共享位置，有关位置的信息
-	NewChatMembers        []User                `json:"new_chat_members,omitempty"`        // 可选的。添加到组或超组中的新成员以及有关它们的信息（机器人本身可能是这些成员之一）
-	LeftChatMember        *User                 `json:"left_chat_member,omitempty"`        // 可选的。成员已从群组中删除，有关他们的信息（该成员可能是漫游器本身）
-	EwChatTitle           string                `json:"ew_chat_title,omitempty"`           // 可选的。聊天标题已更改为此值
-	NewChatPhoto          []PhotoSize           `json:"new_chat_photo,omitempty"`          // 可选的。聊天照片已更改为此值
-	DeleteChatPhoto       bool                  `json:"delete_chat_photo,omitempty"`       // 可选的。服务消息：聊天照片已删除
-	GroupChatCreated      bool                  `json:"group_chat_created,omitempty"`      // 可选的。服务信息：组已创建
-	SupergroupChatCreated bool                  `json:"supergroup_chat_created,omitempty"` // 可选的。服务消息：超组已创建。在通过更新发送的消息中无法接收到该字段，因为bot在创建时不能成为超组的成员。仅当有人回复直接创建的超组中的第一条消息时，才可以在reply_to_message中找到该消息。
-	ChannelChatCreated    bool                  `json:"channel_chat_created,omitempty"`    // 可选的。服务信息：频道已创建。在通过更新发送的消息中无法接收到该字段，因为bot在创建时不能成为频道的成员。如果有人回复频道中的第一条消息，则只能在reply_to_message中找到它。
-	MigrateToChatID       int64                 `json:"migrate_to_chat_id,omitempty"`      // 可选的。该组已迁移到具有指定标识符的超组。该数字可能大于32位，并且某些编程语言在解释它时可能会有困难/无声的缺陷。但是它小于52位，因此带符号的64位整数或双精度浮点类型对于存储此标识符是安全的。
-	MigrateFromChatID     int64                 `json:"migrate_from_chat_id,omitempty"`    // 可选的。超级组已从具有指定标识的组中迁移。该数字可能大于32位，并且某些编程语言在解释它时可能会有困难/无声的缺陷。但是它小于52位，因此带符号的64位整数或双精度浮点类型对于存储此标识符是安全的。
-	PinnedMessage         *Message              `json:"pinned_message,omitempty"`          // 可选的。指定的消息已固定。请注意，即使该字段本身是答复，该字段中的Message对象也不会包含其他的reply_to_message字段。
-	Invoice               *Invoice              `json:"invoice,omitempty"`                 // 可选的。消息是付款的发票，有关发票的信息
-	SuccessfulPayment     *SuccessfulPayment    `json:"successful_payment,omitempty"`      // 可选的。消息是有关成功付款的服务消息，有关付款的信息
-	ConnectedWebsite      string                `json:"connected_website,omitempty"`       // 可选的。用户登录的网站的域名
-	PassportData          *PassportData         `json:"passport_data,omitempty"`           // 可选的。电报护照数据
-	ReplyMarkup           *InlineKeyboardButton `json:"reply_markup,omitempty"`            // 可选的。消息附带的嵌入式键盘。login_url按钮表示为普通url按钮
+	MessageID               int64                    `json:"message_id,omitempty"`              // 此聊天中的唯一消息标识符
+	From                    *User                    `json:"from,omitempty"`                    // 可选的。发件人，对于发送到渠道的消息为空
+	SenderChat              *Chat                    `json:"sender_chat"`                       // 可选的。消息发送方，代表聊天室发送。频道本身用于频道消息。超组本身用于接收来自匿名组管理员的消息。消息的链接通道自动转发到讨论组
+	Data                    int64                    `json:"data,omitempty"`                    // 消息在Unix时间中发送的日期
+	Chat                    *Chat                    `json:"chat,omitempty"`                    // 消息所属的会话
+	ForwardFrom             *User                    `json:"forward_from,omitempty"`            // 可选的。对于转发的邮件，原始邮件的发件人
+	ForwardFromChat         *Chat                    `json:"forward_from_chat,omitempty"`       // 可选的。对于从频道转发的消息，有关原始频道的信息
+	ForwardFromMessageID    int64                    `json:"forward_from_message_id,omitempty"` // 可选的。对于从通道转发的消息，是通道中原始消息的标识符
+	ForwardSignature        string                   `json:"forward_signature,omitempty"`       // 可选的。对于从频道转发的消息，请提供帖子作者的签名（如果有）
+	ForwardSenderName       string                   `json:"forward_sender_name,omitempty"`     // 可选的。从用户转发的邮件的发件人名称，这些用户不允许在转发的邮件中添加指向其帐户的链接
+	ForwardDate             int64                    `json:"forward_date,omitempty"`            // 可选的。对于转发的消息，原始消息的发送日期为Unix时间
+	ReplyToMessage          *Message                 `json:"reply_to_message,omitempty"`        // 可选的。对于答复，原始消息。请注意，即使此字段本身是答复，该字段中的 Message 对象也不会包含其他的reply_to_message字段。
+	ViaBot                  *User                    `json:"via_bot,omitempty"`                 // 可选的。发送消息的机器人
+	EditDate                int64                    `json:"edit_date,omitempty"`               // 可选的。消息最后一次在Unix时间中编辑的日期
+	MediaGroupID            string                   `json:"media_group_id,omitempty"`          // 可选的。该消息所属的媒体消息组的唯一标识符
+	AuthorSignature         string                   `json:"author_signature,omitempty"`        // 可选的。在频道中留言的帖子作者的签名
+	Text                    string                   `json:"text,omitempty"`                    // 可选的。对于文本消息，消息的实际UTF-8文本，0-4096个字符
+	Entities                []MessageEntity          `json:"entities,omitempty"`                // 可选的。对于文本消息，出现在文本中的特殊实体，例如用户名，URL，机器人命令等。
+	Animation               *Animation               `json:"animation,omitempty"`               // 可选的。消息是动画，有关动画的信息。为了向后兼容，设置此字段时，还将设置文档字段
+	Audio                   *Audio                   `json:"audio,omitempty"`                   // 可选的。消息是音频文件，有关该文件的信息
+	Document                *Document                `json:"document,omitempty"`                // 可选的。消息是常规文件，有关文件的信息
+	Photo                   []PhotoSize              `json:"photo,omitempty"`                   // 可选的。邮件是照片，照片的可用尺寸
+	Sticker                 *Sticker                 `json:"sticker,omitempty"`                 // 可选的。消息是贴纸，有关贴纸的信息
+	Video                   *Video                   `json:"video,omitempty"`                   // 可选的。消息是视频，有关视频的信息
+	VideoNote               *VideoNote               `json:"video_note,omitempty"`              // 可选的。留言是视频笔记，有关视频留言的信息
+	Voice                   *Voice                   `json:"voice,omitempty"`                   // 可选的。消息是语音消息，有关文件的信息
+	Caption                 string                   `json:"caption,omitempty"`                 // 可选的。动画，音频，文档，照片，视频或语音的标题，0-1024个字符
+	CaptionEntities         []MessageEntity          `json:"caption_entities,omitempty"`        // 可选的。对于带标题的邮件，出现在标题中的特殊实体，例如用户名，URL，漫游器命令等。
+	Contact                 *Contact                 `json:"contact,omitempty"`                 // 可选的。消息是共享的联系人，有关该联系人的信息
+	Dice                    *Dice                    `json:"dice,omitempty"`                    // 可选的。消息是一个骰子，具有从1到6的随机值
+	Game                    *Game                    `json:"game,omitempty"`                    // 可选的。消息是一个游戏，有关游戏的信息
+	Poll                    *Poll                    `json:"poll,omitempty"`                    // 可选的。消息是本机民意测验，有关民意测验的信息
+	Venue                   *Venue                   `json:"venue,omitempty"`                   // 可选的。消息是一个场地，有关该场地的信息。为了向后兼容，设置此字段时，还将设置位置字段
+	Location                *Location                `json:"location,omitempty"`                // 可选的。消息是共享位置，有关位置的信息
+	NewChatMembers          []User                   `json:"new_chat_members,omitempty"`        // 可选的。添加到组或超组中的新成员以及有关它们的信息（机器人本身可能是这些成员之一）
+	LeftChatMember          *User                    `json:"left_chat_member,omitempty"`        // 可选的。成员已从群组中删除，有关他们的信息（该成员可能是漫游器本身）
+	EwChatTitle             string                   `json:"ew_chat_title,omitempty"`           // 可选的。聊天标题已更改为此值
+	NewChatPhoto            []PhotoSize              `json:"new_chat_photo,omitempty"`          // 可选的。聊天照片已更改为此值
+	DeleteChatPhoto         bool                     `json:"delete_chat_photo,omitempty"`       // 可选的。服务消息：聊天照片已删除
+	GroupChatCreated        bool                     `json:"group_chat_created,omitempty"`      // 可选的。服务信息：组已创建
+	SupergroupChatCreated   bool                     `json:"supergroup_chat_created,omitempty"` // 可选的。服务消息：超组已创建。在通过更新发送的消息中无法接收到该字段，因为bot在创建时不能成为超组的成员。仅当有人回复直接创建的超组中的第一条消息时，才可以在reply_to_message中找到该消息。
+	ChannelChatCreated      bool                     `json:"channel_chat_created,omitempty"`    // 可选的。服务信息：频道已创建。在通过更新发送的消息中无法接收到该字段，因为bot在创建时不能成为频道的成员。如果有人回复频道中的第一条消息，则只能在reply_to_message中找到它。
+	MigrateToChatID         int64                    `json:"migrate_to_chat_id,omitempty"`      // 可选的。该组已迁移到具有指定标识符的超组。该数字可能大于32位，并且某些编程语言在解释它时可能会有困难/无声的缺陷。但是它小于52位，因此带符号的64位整数或双精度浮点类型对于存储此标识符是安全的。
+	MigrateFromChatID       int64                    `json:"migrate_from_chat_id,omitempty"`    // 可选的。超级组已从具有指定标识的组中迁移。该数字可能大于32位，并且某些编程语言在解释它时可能会有困难/无声的缺陷。但是它小于52位，因此带符号的64位整数或双精度浮点类型对于存储此标识符是安全的。
+	PinnedMessage           *Message                 `json:"pinned_message,omitempty"`          // 可选的。指定的消息已固定。请注意，即使该字段本身是答复，该字段中的Message对象也不会包含其他的reply_to_message字段。
+	Invoice                 *Invoice                 `json:"invoice,omitempty"`                 // 可选的。消息是付款的发票，有关发票的信息
+	SuccessfulPayment       *SuccessfulPayment       `json:"successful_payment,omitempty"`      // 可选的。消息是有关成功付款的服务消息，有关付款的信息
+	ConnectedWebsite        string                   `json:"connected_website,omitempty"`       // 可选的。用户登录的网站的域名
+	PassportData            *PassportData            `json:"passport_data,omitempty"`           // 可选的。电报护照数据
+	ProximityAlertTriggered *ProximityAlertTriggered `json:"proximity_alert_triggered"`         // 可选的。服务消息。聊天中的用户在共享实时位置时触发了另一个用户的接近警报。
+	ReplyMarkup             *InlineKeyboardButton    `json:"reply_markup,omitempty"`            // 可选的。消息附带的嵌入式键盘。login_url按钮表示为普通url按钮
 }
 
 const (
@@ -183,6 +188,7 @@ type Audio struct {
 	Duration     int64      `json:"duration,omitempty"`       // 发件人定义的音频持续时间（以秒为单位）
 	Performer    string     `json:"performer,omitempty"`      // 可选的。由发送者或音频标签定义的音频执行者
 	Title        string     `json:"title,omitempty"`          // 可选的。由发送者或音频标签定义的音频标题
+	FileName     string     `json:"file_name"`                // 可选的。发件人定义的原始文件名
 	MimeType     string     `json:"mime_type,omitempty"`      // 可选的。发件人定义的文件的MIME类型
 	FileSize     int64      `json:"file_size,omitempty"`      // 可选的。文件大小
 	Thumb        *PhotoSize `json:"thumb,omitempty"`          // 可选的。音乐文件所属专辑封面的缩略图
@@ -208,6 +214,7 @@ type Video struct {
 	Height       int64      `json:"height,omitempty"`         // 发件人定义的视频高度
 	Duration     int64      `json:"duration,omitempty"`       // 发件人定义的视频高度
 	Thumb        *PhotoSize `json:"thumb,omitempty"`          // 可选的。影片缩图
+	FileName     string     `json:"file_name"`                // 可选的。发件人定义的原始文件名
 	MimeType     string     `json:"mime_type,omitempty"`      // 可选的。发件人定义的文件的MIME类型
 	FileSize     int64      `json:"file_size,omitempty"`      // 可选的。文件大小
 }
@@ -293,18 +300,32 @@ type Poll struct {
 // Location 地图上的一个点
 // https://core.telegram.org/bots/api#location
 type Location struct {
-	Longitude float64 `json:"longitude,omitempty"` // 经度
-	Latitude  float64 `json:"latitude,omitempty"`  // 纬度
+	Longitude            float64 `json:"longitude,omitempty"`    // 经度
+	Latitude             float64 `json:"latitude,omitempty"`     // 纬度
+	HorizontalAccuracy   float64 `json:"horizontal_accuracy"`    // 可选的。位置的不确定性半径，以米为单位；0-1500
+	LivePeriod           int64   `json:"live_period"`            // 可选的。相对于消息发送日期的时间，在此期间可以更新位置，以秒为单位。仅适用于活动的实时位置。
+	Heading              int64   `json:"heading"`                // 可选的。用户移动的方向，以度为单位；1-360。仅适用于活动的实时位置。
+	ProximityAlertRadius int64   `json:"proximity_alert_radius"` // 可选的。有关接近另一个聊天成员的接近警报的最大距离（以米为单位）。仅适用于已发送的实时位置。
 }
 
 // Venue 表示场地
 // https://core.telegram.org/bots/api#venue
 type Venue struct {
-	Location       *Location `json:"location,omitempty"`        // 场地位置
-	Title          string    `json:"title,omitempty"`           // 会场名称
-	Address        string    `json:"address,omitempty"`         // 会场地址
-	FoursquareID   string    `json:"foursquare_id,omitempty"`   // 可选的。场地的Foursquare标识符
-	FoursquareType string    `json:"foursquare_type,omitempty"` // 可选的。场地的Foursquare类型。（例如，“arts_entertainment/default”, “arts_entertainment/aquarium” or “food/icecream”。）
+	Location        *Location `json:"location,omitempty"`        // 场地位置
+	Title           string    `json:"title,omitempty"`           // 会场名称
+	Address         string    `json:"address,omitempty"`         // 会场地址
+	FoursquareID    string    `json:"foursquare_id,omitempty"`   // 可选的。场地的Foursquare标识符
+	FoursquareType  string    `json:"foursquare_type,omitempty"` // 可选的。场地的Foursquare类型。（例如，“arts_entertainment/default”, “arts_entertainment/aquarium” or “food/icecream”。）
+	GooglePlaceID   string    `json:"google_place_id"`           // 可选的。场地的Google地方信息标识符
+	GooglePlaceType string    `json:"google_place_type"`         // 可选的。场所的Google地方信息类型。（请参阅支持的类型 https://developers.google.com/places/web-service/supported_types 。）
+}
+
+// ProximityAlertTriggered 该对象表示服务消息的内容，每当聊天中的某个用户触发另一个用户设置的接近警报时，就会发送该消息。
+// https://core.telegram.org/bots/api#proximityalerttriggered
+type ProximityAlertTriggered struct {
+	Traveler *User `json:"traveler"` // 触发警报的用户
+	Watcher  *User `json:"watcher"`  // 设置警报的用户
+	Distance int64 `json:"distance"` // 用户之间的距离
 }
 
 // UserProfilePhotos 用户的个人资料图片
@@ -431,7 +452,7 @@ type ChatMember struct {
 	User                  *User  `json:"user,omitempty"`                      // 有关用户的信息
 	Status                string `json:"status,omitempty"`                    // 成员在聊天中的状态。可以是 “creator”, “administrator”, “member”, “restricted”, “left” or “kicked”
 	CustomTitle           string `json:"custom_title,omitempty"`              // 可选的。仅所有者和管理员。该用户的自定义标题
-	UntilDate             int64  `json:"until_date,omitempty"`                // 可选的。限制和踢。对该用户取消限制的日期；Unix时间
+	IsAnonymous           bool   `json:"is_anonymous"`                        // 可选的。仅所有者和管理员。可以，如果隐藏了用户在聊天中的状态
 	CanBeEdited           bool   `json:"can_be_edited,omitempty"`             // 可选的。仅管理员。是的，如果允许漫游器编辑该用户的管理员权限
 	CanPostMessages       bool   `json:"can_post_messages,omitempty"`         // 可选的。仅管理员。是的，如果管理员可以在频道中发布；仅频道
 	CanEditMessages       bool   `json:"can_edit_messages,omitempty"`         // 可选的。仅管理员。是的，如果管理员可以编辑其他用户的消息并可以固定消息；仅频道
@@ -447,6 +468,7 @@ type ChatMember struct {
 	CanSendPolls          bool   `json:"can_send_polls,omitempty"`            // 可选的。仅受限制。是的，如果允许用户发送民意调查
 	CanSendOtherMessages  bool   `json:"can_send_other_messages,omitempty"`   // 可选的。仅受限制。是的，如果允许用户发送动画，游戏，贴纸并使用嵌入式机器人
 	CanAddWebPagePreviews bool   `json:"can_add_web_page_previews,omitempty"` // 可选的。仅受限制。是的，如果允许用户将网页预览添加到他们的消息中
+	UntilDate             int64  `json:"until_date,omitempty"`                // 可选的。限制和踢。对该用户取消限制的日期；Unix时间
 }
 
 // ChatPermissions 允许非管理员用户进行聊天的操作
@@ -460,6 +482,13 @@ type ChatPermissions struct {
 	CanChangeInfo         bool `json:"can_change_info,omitempty"`           // 可选的。True，如果允许用户更改聊天标题，照片和其他设置。在公共超级组中被忽略
 	CanInviteUsers        bool `json:"can_invite_users,omitempty"`          // 可选的。True，如果允许用户邀请新用户加入聊天
 	CanPinMessages        bool `json:"can_pin_messages,omitempty"`          // 可选的。True，如果允许用户固定消息。在公共超级组中被忽略
+}
+
+// ChatLocation
+// https://core.telegram.org/bots/api#chatlocation
+type ChatLocation struct {
+	Location *Location `json:"location"` // 超组连接到的位置。不能是居住地点。
+	Address  string    `json:"address"`  // 位置地址；1-64个字符，由聊天所有者定义
 }
 
 // BotCommand 机器人命令
@@ -479,10 +508,11 @@ const InputMediaPhotoType = "photo"
 // InputMediaPhoto 要发送的照片
 // https://core.telegram.org/bots/api#inputmediaphoto
 type InputMediaPhoto struct {
-	Type      string `json:"type,omitempty"`       // 结果类型，必须是 photo
-	Media     string `json:"media,omitempty"`      // 文件发送。传递file_id以发送电报服务器上存在的文件（推荐），传递电报的HTTP URL以从Internet获取文件，或传递“ attach：// <file_attach_name>”以使用multipart / <file_attach_name>名称下的form-data。
-	Caption   string `json:"caption,omitempty"`    // 可选的。要发送的照片的标题，实体解析后0-1024个字符
-	ParseMode string `json:"parse_mode,omitempty"` // 可选的。解析照片标题中的实体的模式。有关更多详细信息，请参见格式化选项。
+	Type            string          `json:"type,omitempty"`       // 结果类型，必须是 photo
+	Media           string          `json:"media,omitempty"`      // 文件发送。传递file_id以发送电报服务器上存在的文件（推荐），传递电报的HTTP URL以从Internet获取文件，或传递“ attach：// <file_attach_name>”以使用multipart / <file_attach_name>名称下的form-data。
+	Caption         string          `json:"caption,omitempty"`    // 可选的。要发送的照片的标题，实体解析后0-1024个字符
+	ParseMode       string          `json:"parse_mode,omitempty"` // 可选的。解析照片标题中的实体的模式。有关更多详细信息，请参见格式化选项。
+	CaptionEntities []MessageEntity `json:"caption_entities"`     // 可选的。标题中显示的特殊实体的列表，可以指定这些实体，而不是parse_mode
 }
 
 // InputMediaVideoType 视频类型
@@ -491,15 +521,16 @@ const InputMediaVideoType = "video"
 // InputMediaVideo 要发送的视频
 // https://core.telegram.org/bots/api#inputmediavideo
 type InputMediaVideo struct {
-	Type              string    `json:"type,omitempty"`               // 结果类型，必须是 video
-	Media             string    `json:"media,omitempty"`              // 文件发送。传递file_id以发送电报服务器上存在的文件（推荐），传递电报的HTTP URL以从Internet获取文件，或传递“ attach：// <file_attach_name>”以使用multipart / <file_attach_name>名称下的form-data。有关发送文件的更多信息»
-	Thumb             InputFile `json:"thumb,omitempty"`              // 可选的。已发送文件的缩略图；如果在服务器端支持为文件生成缩略图，则可以忽略。缩略图应为JPEG格式，并且大小应小于200 kB。缩略图的宽度和高度不应超过320。如果未使用multipart / form-data上传文件，则忽略该缩略图。缩略图不能重复使用，只能作为新文件上传，因此如果缩略图是使用<file_attach_name>下的multipart / form-data上传的，则可以传递“ attach：// <file_attach_name>”。
-	Caption           string    `json:"caption,omitempty"`            // 可选的。要发送的视频的标题，实体解析后0-1024个字符
-	ParseMode         string    `json:"parse_mode,omitempty"`         // 可选的。视频字幕中的实体解析模式。有关更多详细信息，请参见格式化选项
-	Width             int64     `json:"width,omitempty"`              // 可选的。影片宽度
-	Height            int64     `json:"height,omitempty"`             // 可选的。影片高度
-	Duration          int64     `json:"duration,omitempty"`           // 可选的。影片时长
-	SupportsStreaming bool      `json:"supports_streaming,omitempty"` // 可选的。如果上传的视频适合流式传输，则通过True
+	Type              string          `json:"type,omitempty"`               // 结果类型，必须是 video
+	Media             string          `json:"media,omitempty"`              // 文件发送。传递file_id以发送电报服务器上存在的文件（推荐），传递电报的HTTP URL以从Internet获取文件，或传递“ attach：// <file_attach_name>”以使用multipart / <file_attach_name>名称下的form-data。有关发送文件的更多信息»
+	Thumb             InputFile       `json:"thumb,omitempty"`              // 可选的。已发送文件的缩略图；如果在服务器端支持为文件生成缩略图，则可以忽略。缩略图应为JPEG格式，并且大小应小于200 kB。缩略图的宽度和高度不应超过320。如果未使用multipart / form-data上传文件，则忽略该缩略图。缩略图不能重复使用，只能作为新文件上传，因此如果缩略图是使用<file_attach_name>下的multipart / form-data上传的，则可以传递“ attach：// <file_attach_name>”。
+	Caption           string          `json:"caption,omitempty"`            // 可选的。要发送的视频的标题，实体解析后0-1024个字符
+	ParseMode         string          `json:"parse_mode,omitempty"`         // 可选的。视频字幕中的实体解析模式。有关更多详细信息，请参见格式化选项
+	CaptionEntities   []MessageEntity `json:"caption_entities"`             // 可选的。标题中显示的特殊实体的列表，可以指定这些实体，而不是parse_mode
+	Width             int64           `json:"width,omitempty"`              // 可选的。影片宽度
+	Height            int64           `json:"height,omitempty"`             // 可选的。影片高度
+	Duration          int64           `json:"duration,omitempty"`           // 可选的。影片时长
+	SupportsStreaming bool            `json:"supports_streaming,omitempty"` // 可选的。如果上传的视频适合流式传输，则通过True
 }
 
 // InputMediaAnimationType 动画文件 类型
@@ -508,14 +539,15 @@ const InputMediaAnimationType = "animation"
 // InputMediaAnimation 要发送的动画文件（GIF或H.264 / MPEG-4 AVC视频，无声音）。
 // https://core.telegram.org/bots/api#inputmediaanimation
 type InputMediaAnimation struct {
-	Type      string    `json:"type,omitempty"`       // 结果类型，必须是 animation
-	Media     string    `json:"media,omitempty"`      // 文件发送。传递file_id以发送电报服务器上存在的文件（推荐），传递电报的HTTP URL以从Internet获取文件，或传递“ attach：// <file_attach_name>”以使用multipart / <file_attach_name>名称下的form-data。
-	Thumb     InputFile `json:"thumb,omitempty"`      // 可选的。已发送文件的缩略图；如果在服务器端支持为文件生成缩略图，则可以忽略。缩略图应为JPEG格式，并且大小应小于200 kB。缩略图的宽度和高度不应超过320。如果未使用multipart / form-data上传文件，则忽略该缩略图。缩略图不能重复使用，只能作为新文件上传，因此如果缩略图是使用<file_attach_name>下的multipart / form-data上传的，则可以传递“ attach：// <file_attach_name>”
-	Caption   string    `json:"caption,omitempty"`    // 可选的。要发送的动画的标题，实体解析后为0-1024个字符
-	ParseMode string    `json:"parse_mode,omitempty"` // 可选的。解析动画标题中实体的模式。有关更多详细信息，请参见格式化选项。
-	Width     int64     `json:"width,omitempty"`      // 可选的。动画宽度
-	Height    int64     `json:"height,omitempty"`     // 可选的。动画高度
-	Duration  int64     `json:"duration,omitempty"`   // 可选的。动画时长
+	Type            string          `json:"type,omitempty"`       // 结果类型，必须是 animation
+	Media           string          `json:"media,omitempty"`      // 文件发送。传递file_id以发送电报服务器上存在的文件（推荐），传递电报的HTTP URL以从Internet获取文件，或传递“ attach：// <file_attach_name>”以使用multipart / <file_attach_name>名称下的form-data。
+	Thumb           InputFile       `json:"thumb,omitempty"`      // 可选的。已发送文件的缩略图；如果在服务器端支持为文件生成缩略图，则可以忽略。缩略图应为JPEG格式，并且大小应小于200 kB。缩略图的宽度和高度不应超过320。如果未使用multipart / form-data上传文件，则忽略该缩略图。缩略图不能重复使用，只能作为新文件上传，因此如果缩略图是使用<file_attach_name>下的multipart / form-data上传的，则可以传递“ attach：// <file_attach_name>”
+	Caption         string          `json:"caption,omitempty"`    // 可选的。要发送的动画的标题，实体解析后为0-1024个字符
+	ParseMode       string          `json:"parse_mode,omitempty"` // 可选的。解析动画标题中实体的模式。有关更多详细信息，请参见格式化选项。
+	CaptionEntities []MessageEntity `json:"caption_entities"`     // 可选的。标题中显示的特殊实体的列表，可以指定这些实体，而不是parse_mode
+	Width           int64           `json:"width,omitempty"`      // 可选的。动画宽度
+	Height          int64           `json:"height,omitempty"`     // 可选的。动画高度
+	Duration        int64           `json:"duration,omitempty"`   // 可选的。动画时长
 }
 
 // InputMediaAudioType 音乐类型
@@ -524,24 +556,27 @@ const InputMediaAudioType = "audio"
 // InputMediaAudio 发送的音乐
 // https://core.telegram.org/bots/api#inputmediaaudio
 type InputMediaAudio struct {
-	Type      string    `json:"type,omitempty"`       // 结果类型，必须为 audio
-	Media     string    `json:"media,omitempty"`      // 文件发送。传递file_id以发送电报服务器上存在的文件（推荐），传递电报的HTTP URL以从Internet获取文件，或传递“ attach：// <file_attach_name>”以使用multipart / <file_attach_name>名称下的form-data
-	Thumb     InputFile `json:"thumb,omitempty"`      // 可选的。已发送文件的缩略图；如果在服务器端支持为文件生成缩略图，则可以忽略。缩略图应为JPEG格式，并且大小应小于200 kB。缩略图的宽度和高度不应超过320。如果未使用multipart / form-data上传文件，则忽略该缩略图。缩略图不能重复使用，只能作为新文件上传，因此如果缩略图是使用<file_attach_name>下的multipart / form-data上传的，则可以传递“ attach：// <file_attach_name>”。
-	Caption   string    `json:"caption,omitempty"`    // 可选的。要发送的音频的标题，实体解析后为0-1024个字符
-	ParseMode string    `json:"parse_mode,omitempty"` // 可选的。解析音频字幕中实体的模式。有关更多详细信息，请参见格式化选项。
-	Duration  int64     `json:"duration,omitempty"`   // 可选的。音频持续时间（以秒为单位）
-	Performer string    `json:"performer,omitempty"`  // 可选的。音频表演者
-	Title     string    `json:"title,omitempty"`      // 可选的。音频标题
+	Type            string          `json:"type,omitempty"`       // 结果类型，必须为 audio
+	Media           string          `json:"media,omitempty"`      // 文件发送。传递file_id以发送电报服务器上存在的文件（推荐），传递电报的HTTP URL以从Internet获取文件，或传递“ attach：// <file_attach_name>”以使用multipart / <file_attach_name>名称下的form-data
+	Thumb           InputFile       `json:"thumb,omitempty"`      // 可选的。已发送文件的缩略图；如果在服务器端支持为文件生成缩略图，则可以忽略。缩略图应为JPEG格式，并且大小应小于200 kB。缩略图的宽度和高度不应超过320。如果未使用multipart / form-data上传文件，则忽略该缩略图。缩略图不能重复使用，只能作为新文件上传，因此如果缩略图是使用<file_attach_name>下的multipart / form-data上传的，则可以传递“ attach：// <file_attach_name>”。
+	Caption         string          `json:"caption,omitempty"`    // 可选的。要发送的音频的标题，实体解析后为0-1024个字符
+	ParseMode       string          `json:"parse_mode,omitempty"` // 可选的。解析音频字幕中实体的模式。有关更多详细信息，请参见格式化选项。
+	CaptionEntities []MessageEntity `json:"caption_entities"`     // 可选的。标题中显示的特殊实体的列表，可以指定这些实体，而不是parse_mode
+	Duration        int64           `json:"duration,omitempty"`   // 可选的。音频持续时间（以秒为单位）
+	Performer       string          `json:"performer,omitempty"`  // 可选的。音频表演者
+	Title           string          `json:"title,omitempty"`      // 可选的。音频标题
 }
 
 // InputMediaDocument 要发送的常规文件
 // https://core.telegram.org/bots/api#inputmediadocument
 type InputMediaDocument struct {
-	Type      string    `json:"type,omitempty"`       // 结果类型，必须为文件
-	Media     string    `json:"media,omitempty"`      // 文件发送。传递file_id以发送电报服务器上存在的文件（推荐），传递电报的HTTP URL以从Internet获取文件，或传递“ attach：// <file_attach_name>”以使用multipart / <file_attach_name>名称下的form-data。
-	Thumb     InputFile `json:"thumb,omitempty"`      // 可选的。已发送文件的缩略图；如果在服务器端支持为文件生成缩略图，则可以忽略。缩略图应为JPEG格式，并且大小应小于200 kB。缩略图的宽度和高度不应超过320。如果未使用multipart / form-data上传文件，则忽略该缩略图。缩略图不能重复使用，只能作为新文件上传，因此如果缩略图是使用<file_attach_name>下的multipart / form-data上传的，则可以传递“ attach：// <file_attach_name>”。
-	Caption   string    `json:"caption,omitempty"`    // 可选的。待发送文档的标题，实体解析后0-1024个字符
-	ParseMode string    `json:"parse_mode,omitempty"` // 可选的。解析文档标题中的实体的模式。有关更多详细信息，请参见格式化选项。
+	Type                        string          `json:"type,omitempty"`                 // 结果类型，必须为文件
+	Media                       string          `json:"media,omitempty"`                // 文件发送。传递file_id以发送电报服务器上存在的文件（推荐），传递电报的HTTP URL以从Internet获取文件，或传递“ attach：// <file_attach_name>”以使用multipart / <file_attach_name>名称下的form-data。
+	Thumb                       InputFile       `json:"thumb,omitempty"`                // 可选的。已发送文件的缩略图；如果在服务器端支持为文件生成缩略图，则可以忽略。缩略图应为JPEG格式，并且大小应小于200 kB。缩略图的宽度和高度不应超过320。如果未使用multipart / form-data上传文件，则忽略该缩略图。缩略图不能重复使用，只能作为新文件上传，因此如果缩略图是使用<file_attach_name>下的multipart / form-data上传的，则可以传递“ attach：// <file_attach_name>”。
+	Caption                     string          `json:"caption,omitempty"`              // 可选的。待发送文档的标题，实体解析后0-1024个字符
+	ParseMode                   string          `json:"parse_mode,omitempty"`           // 可选的。解析文档标题中的实体的模式。有关更多详细信息，请参见格式化选项。
+	CaptionEntities             []MessageEntity `json:"caption_entities"`               // 可选的。标题中显示的特殊实体的列表，可以指定这些实体，而不是parse_mode
+	DisableContentTypeDetection bool            `json:"disable_content_type_detection"` // 可选的。对使用multipart / form-data上传的文件禁用服务器端内容类型自动检测。如果文档是作为相册的一部分发送的，则始终为true。
 }
 
 // InputFile 上传文件的内容。必须使用 multipart/form-data 以通过浏览器上传文件的通常方式进行发布。
