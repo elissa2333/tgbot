@@ -2,6 +2,9 @@ package tgbot
 
 import (
 	"encoding/json"
+	"errors"
+	"fmt"
+	"io"
 	"io/ioutil"
 	"net/http"
 	stdURL "net/url"
@@ -20,8 +23,9 @@ type ActiveProcessorFunc func(api *telegram.API) error
 
 // Bot bot 实体
 type Bot struct {
-	api     *telegram.API // telegram API
-	timeout uint          // 长时间轮询的超时时间（以秒为单位）为0即通常的短轮询。应该为正，短轮询应仅用于测试目的
+	API *telegram.API // telegram api
+
+	timeout uint // 长时间轮询的超时时间（以秒为单位）为0即通常的短轮询。应该为正，短轮询应仅用于测试目的
 
 	webHookEngine func() error
 
@@ -48,7 +52,7 @@ type BotOptional struct {
 // New 新建 bot
 func New(id int, token string, optional *BotOptional) *Bot {
 	b := &Bot{
-		api:      telegram.New(nil, id, token),
+		API:      telegram.New(nil, id, token),
 		timeout:  15,
 		commands: map[string]MessageProcessorFunc{},
 		done:     make(chan struct{}),
@@ -59,7 +63,7 @@ func New(id int, token string, optional *BotOptional) *Bot {
 		b.timeout = optional.Timeout
 
 		if optional.HTTPClient != nil {
-			b.api = telegram.New(optional.HTTPClient, id, token)
+			b.API = telegram.New(optional.HTTPClient, id, token)
 		}
 	}
 
@@ -67,13 +71,13 @@ func New(id int, token string, optional *BotOptional) *Bot {
 }
 
 // SetWebhook 设置 webhook
-func (b *Bot) SetWebhook(url string /*api 访问地址*/, address string /*本地监听地址*/, optional *telegram.OptionalWebhook) error {
+func (b *Bot) SetWebhook(url string /*API 访问地址*/, address string /*本地监听地址*/, optional *telegram.OptionalWebhook) error {
 	parseURL, err := stdURL.Parse(url)
 	if err != nil {
 		return err
 	}
 
-	if err := b.api.SetWebhook(url, optional); err != nil {
+	if err := b.API.SetWebhook(url, optional); err != nil {
 		return err
 	}
 
@@ -119,12 +123,12 @@ func (b *Bot) SetWebhook(url string /*api 访问地址*/, address string /*本�
 // DeleteWebhook  删除 webhook
 func (b *Bot) DeleteWebhook() error {
 	b.webHookEngine = nil
-	return b.api.DeleteWebhook()
+	return b.API.DeleteWebhook()
 }
 
 // GetWebhookInfo 获取 webhook 信息
 func (b *Bot) GetWebhookInfo() (*telegram.WebhookInfo, error) {
-	return b.api.GetWebhookInfo()
+	return b.API.GetWebhookInfo()
 }
 
 // AddCommandProcessor 添加命令处理器（接收到命令后调用）
@@ -139,7 +143,7 @@ func (b *Bot) SetDefaultCommandProcessor(execFunc MessageProcessorFunc) {
 
 // MessageContextBase 基础上下文信息
 type MessageContextBase struct {
-	API *telegram.API
+	*telegram.API
 
 	MessageID int64
 	Form      *telegram.User
@@ -178,9 +182,32 @@ func (b *Bot) SetMessageProcessorAtText(fn TextMessageProcessorFunc) {
 	b.setMessageProcessorAt(ContextTypeAtText, fn)
 }
 
+// MessageContextIncludeFile 上下文信息包含文件
+type MessageContextIncludeFile struct {
+	MessageContextBase
+}
+
+// GetDownloadURL 获取文件下载地址下载地址
+func (mcf MessageContextIncludeFile) GetDownloadURL(filePath string) string {
+	return fmt.Sprintf("https://api.telegram.org/file/bot%d:%s/%s", mcf.ID, mcf.Token, filePath)
+}
+
+//DownloadFile 下载文件
+func (mcf MessageContextIncludeFile) DownloadFile(filePath string) (io.ReadCloser, error) {
+	res, err := mcf.HTTPClient.DeleteBaseURL().Get(mcf.GetDownloadURL(filePath))
+	if err != nil {
+		return nil, err
+	}
+	if res.StatusCode != http.StatusOK {
+		return nil, errors.New("http response code is not a 200")
+	}
+
+	return res.Body, err
+}
+
 // MessageContextAtPhoto 照片消息上下文
 type MessageContextAtPhoto struct {
-	MessageContextBase
+	MessageContextIncludeFile
 
 	Photo   []telegram.PhotoSize
 	Caption string
@@ -196,7 +223,7 @@ func (b *Bot) SetMessageProcessorAtPhoto(fn ProcessorAtPhotoFunc) {
 
 // MessageContextAtVoice 语音消息上下文
 type MessageContextAtVoice struct {
-	MessageContextBase
+	MessageContextIncludeFile
 
 	Voice *telegram.Voice
 }
@@ -211,7 +238,7 @@ func (b *Bot) SetMessageProcessorAtVoice(fn ProcessorAtVoiceFunc) {
 
 // MessageContextAtAudio 音频消息上下文
 type MessageContextAtAudio struct {
-	MessageContextBase
+	MessageContextIncludeFile
 
 	Audio   *telegram.Audio
 	Caption string
@@ -220,13 +247,14 @@ type MessageContextAtAudio struct {
 // ProcessorAtAudioFunc 音频消息处理函数
 type ProcessorAtAudioFunc func(c *MessageContextAtAudio) error
 
+// SetMessageProcessorAtAudio 音频消息处理器
 func (b *Bot) SetMessageProcessorAtAudio(fn ProcessorAtAudioFunc) {
 	b.setMessageProcessorAt(ContextTypeAtAudio, fn)
 }
 
 // MessageContextAtVideo 视频消息上下文
 type MessageContextAtVideo struct {
-	MessageContextBase
+	MessageContextIncludeFile
 
 	Video   *telegram.Video
 	Caption string
@@ -235,28 +263,30 @@ type MessageContextAtVideo struct {
 // ProcessorAtVideoFunc 视频消息处理函数
 type ProcessorAtVideoFunc func(c *MessageContextAtVideo) error
 
+// SetMessageProcessorAtVideo 视频消息处理器
 func (b *Bot) SetMessageProcessorAtVideo(fn ProcessorAtVideoFunc) {
 	b.setMessageProcessorAt(ContextTypeAtVideo, fn)
 }
 
 // MessageContextAtAnimation 动画（gif）消息上下文
 type MessageContextAtAnimation struct {
-	MessageContextBase
+	MessageContextIncludeFile
 
 	Animation *telegram.Animation
 	Document  *telegram.Document
 }
 
-// ProcessorAtAtAnimationFunc 动画消息处理函数
+// ProcessorAtAnimationFunc 动画消息处理函数
 type ProcessorAtAnimationFunc func(c *MessageContextAtAnimation) error
 
+// SetMessageProcessorAtAnimation 动画消息处理器
 func (b *Bot) SetMessageProcessorAtAnimation(fn ProcessorAtAnimationFunc) {
 	b.setMessageProcessorAt(ContextTypeAtAnimation, fn)
 }
 
 // MessageContextAtDocument 文件消息上下文
 type MessageContextAtDocument struct {
-	MessageContextBase
+	MessageContextIncludeFile
 
 	Document *telegram.Document
 	Caption  string
@@ -265,13 +295,14 @@ type MessageContextAtDocument struct {
 // ProcessorAtDocumentFunc 文件消息处理函数
 type ProcessorAtDocumentFunc func(c *MessageContextAtDocument) error
 
+// SetMessageProcessorAtDocument 文件消息处理器
 func (b *Bot) SetMessageProcessorAtDocument(fn ProcessorAtDocumentFunc) {
 	b.setMessageProcessorAt(ContextTypeAtDocument, fn)
 }
 
 // MessageContextAtSticker 贴纸消息上下文
 type MessageContextAtSticker struct {
-	MessageContextBase
+	MessageContextIncludeFile
 
 	Sticker *telegram.Sticker
 }
@@ -279,20 +310,22 @@ type MessageContextAtSticker struct {
 // ProcessorAtStickerFunc 贴纸消息处理函数
 type ProcessorAtStickerFunc func(c *MessageContextAtSticker) error
 
+// SetMessageProcessorAtSticker 贴纸消息处理器
 func (b *Bot) SetMessageProcessorAtSticker(fn ProcessorAtStickerFunc) {
 	b.setMessageProcessorAt(ContextTypeAtSticker, fn)
 }
 
 // MessageContextAtVideoNote 视频笔记消息上下文
 type MessageContextAtVideoNote struct {
-	MessageContextBase
+	MessageContextIncludeFile
 
 	VideoNote *telegram.VideoNote
 }
 
-// ProcessorAtVideoNoteFunc 视频笔记消息处理函数
+// ProcessorAtVideoNoteFunc 视频笔记处理函数
 type ProcessorAtVideoNoteFunc func(c *MessageContextAtVideoNote) error
 
+// SetMessageProcessorAtVideoNote 视频笔记处理器
 func (b *Bot) SetMessageProcessorAtVideoNote(fn ProcessorAtVideoNoteFunc) {
 	b.setMessageProcessorAt(ContextTypeAtVideoNote, fn)
 }
@@ -307,6 +340,7 @@ type MessageContextAtContact struct {
 // ProcessorAtContactFunc 联系人消息处理函数
 type ProcessorAtContactFunc func(c *MessageContextAtContact) error
 
+// SetMessageProcessorAtContact 联系人消息处理器
 func (b *Bot) SetMessageProcessorAtContact(fn ProcessorAtContactFunc) {
 	b.setMessageProcessorAt(ContextTypeAtContact, fn)
 }
@@ -321,13 +355,14 @@ type MessageContextAtDice struct {
 // ProcessorAtDiceFunc 色子消息处理函数
 type ProcessorAtDiceFunc func(c *MessageContextAtDice) error
 
+// SetMessageProcessorAtDice 色子消息处理器
 func (b *Bot) SetMessageProcessorAtDice(fn ProcessorAtDiceFunc) {
 	b.setMessageProcessorAt(ContextTypeAtDice, fn)
 }
 
 // MessageContextAtGame 游戏消息上下文
 type MessageContextAtGame struct {
-	MessageContextBase
+	MessageContextIncludeFile
 
 	Game *telegram.Game
 }
@@ -335,6 +370,7 @@ type MessageContextAtGame struct {
 // ProcessorAtGameFunc 游戏消息处理函数
 type ProcessorAtGameFunc func(c *MessageContextAtGame) error
 
+// SetMessageProcessorAtGame 游戏消息处理函数
 func (b *Bot) SetMessageProcessorAtGame(fn ProcessorAtGameFunc) {
 	b.setMessageProcessorAt(ContextTypeAtGame, fn)
 }
@@ -349,6 +385,7 @@ type MessageContextAtPoll struct {
 // ProcessorAtPollFunc 调查消息处理函数
 type ProcessorAtPollFunc func(c *MessageContextAtPoll) error
 
+// SetMessageProcessorAtPoll 调查消息处理器
 func (b *Bot) SetMessageProcessorAtPoll(fn ProcessorAtPollFunc) {
 	b.setMessageProcessorAt(ContextTypeAtPoll, fn)
 }
@@ -363,6 +400,7 @@ type MessageContextAtVenue struct {
 // ProcessorAtVenueFunc 场地消息处理函数
 type ProcessorAtVenueFunc func(c *MessageContextAtVenue) error
 
+// SetMessageProcessorAtVenue 场地消息处理器
 func (b *Bot) SetMessageProcessorAtVenue(fn ProcessorAtVenueFunc) {
 	b.setMessageProcessorAt(ContextTypeAtVenue, fn)
 }
@@ -377,6 +415,7 @@ type MessageContextAtLocation struct {
 // ProcessorAtLocationFunc 共享位置消息处理函数
 type ProcessorAtLocationFunc func(c *MessageContextAtLocation) error
 
+// SetMessageProcessorAtLocation 共享位置消息处理器
 func (b *Bot) SetMessageProcessorAtLocation(fn ProcessorAtLocationFunc) {
 	b.setMessageProcessorAt(ContextTypeAtLocation, fn)
 }
@@ -405,7 +444,7 @@ func (b *Bot) AddActiveProcessor(activeProcessorFunc ActiveProcessorFunc) {
 // Run 运行 bot
 // 只有再拥有 Processor 时才会正常阻塞
 func (b *Bot) Run() error {
-	_, err := b.api.GetMe() // check api
+	_, err := b.API.GetMe() // check api
 	if err != nil {
 		return err
 	}
@@ -451,7 +490,7 @@ func (b *Bot) checkTask() {
 	for _, vFn := range b.activeProcessorFunc {
 		totalNumberOfActiveAndPassive++
 		go func(fn ActiveProcessorFunc) {
-			if err := fn(b.api); err != nil {
+			if err := fn(b.API); err != nil {
 				b.handleError(err)
 			}
 			cleanActiveAndPassiveCh <- struct{}{}
@@ -481,7 +520,7 @@ func (b *Bot) initiativeEngine() {
 	b.checkTask()
 
 	for {
-		updates, err := b.api.GetUpdates(b.MsgOffset, 1, b.timeout)
+		updates, err := b.API.GetUpdates(b.MsgOffset, 1, b.timeout)
 		if err != nil {
 			b.handleError(err)
 			break
@@ -501,7 +540,7 @@ func (b *Bot) initiativeEngine() {
 func (b *Bot) handleReceivedMessages(message *telegram.Message) {
 	ctx := &Context{
 		Message: message,
-		API:     b.api,
+		API:     b.API,
 	}
 
 	// 消息类型判断
@@ -588,9 +627,9 @@ func (b *Bot) handleReceivedMessages(message *telegram.Message) {
 			case ContextTypeAtPhoto:
 				fn := b.specifiedTypeMessageProcessorFunc[ctx.MessageType].(ProcessorAtPhotoFunc)
 				c := &MessageContextAtPhoto{
-					MessageContextBase: base,
-					Photo:              ctx.Message.Photo,
-					Caption:            ctx.Message.Caption,
+					MessageContextIncludeFile: MessageContextIncludeFile{MessageContextBase: base},
+					Photo:                     ctx.Message.Photo,
+					Caption:                   ctx.Message.Caption,
 				}
 				if err := fn(c); err != nil {
 					b.handleError(err)
@@ -599,8 +638,8 @@ func (b *Bot) handleReceivedMessages(message *telegram.Message) {
 			case ContextTypeAtVoice:
 				fn := b.specifiedTypeMessageProcessorFunc[ctx.MessageType].(ProcessorAtVoiceFunc)
 				c := &MessageContextAtVoice{
-					MessageContextBase: base,
-					Voice:              ctx.Message.Voice,
+					MessageContextIncludeFile: MessageContextIncludeFile{MessageContextBase: base},
+					Voice:                     ctx.Message.Voice,
 				}
 				if err := fn(c); err != nil {
 					b.handleError(err)
@@ -609,7 +648,7 @@ func (b *Bot) handleReceivedMessages(message *telegram.Message) {
 			case ContextTypeAtAudio:
 				fn := b.specifiedTypeMessageProcessorFunc[ctx.MessageType].(ProcessorAtAudioFunc)
 				c := &MessageContextAtAudio{
-					MessageContextBase: base,
+					MessageContextIncludeFile: MessageContextIncludeFile{MessageContextBase: base},
 
 					Audio:   ctx.Message.Audio,
 					Caption: ctx.Message.Caption,
@@ -621,7 +660,7 @@ func (b *Bot) handleReceivedMessages(message *telegram.Message) {
 			case ContextTypeAtVideo:
 				fn := b.specifiedTypeMessageProcessorFunc[ctx.MessageType].(ProcessorAtVideoFunc)
 				c := &MessageContextAtVideo{
-					MessageContextBase: base,
+					MessageContextIncludeFile: MessageContextIncludeFile{MessageContextBase: base},
 
 					Video:   ctx.Message.Video,
 					Caption: ctx.Message.Caption,
@@ -633,7 +672,7 @@ func (b *Bot) handleReceivedMessages(message *telegram.Message) {
 			case ContextTypeAtAnimation:
 				fn := b.specifiedTypeMessageProcessorFunc[ctx.MessageType].(ProcessorAtAnimationFunc)
 				c := &MessageContextAtAnimation{
-					MessageContextBase: base,
+					MessageContextIncludeFile: MessageContextIncludeFile{MessageContextBase: base},
 
 					Animation: ctx.Message.Animation,
 					Document:  ctx.Message.Document,
@@ -645,7 +684,7 @@ func (b *Bot) handleReceivedMessages(message *telegram.Message) {
 			case ContextTypeAtDocument:
 				fn := b.specifiedTypeMessageProcessorFunc[ctx.MessageType].(ProcessorAtDocumentFunc)
 				c := &MessageContextAtDocument{
-					MessageContextBase: base,
+					MessageContextIncludeFile: MessageContextIncludeFile{MessageContextBase: base},
 
 					Document: ctx.Message.Document,
 					Caption:  ctx.Message.Caption,
@@ -657,7 +696,7 @@ func (b *Bot) handleReceivedMessages(message *telegram.Message) {
 			case ContextTypeAtSticker:
 				fn := b.specifiedTypeMessageProcessorFunc[ctx.MessageType].(ProcessorAtStickerFunc)
 				c := &MessageContextAtSticker{
-					MessageContextBase: base,
+					MessageContextIncludeFile: MessageContextIncludeFile{MessageContextBase: base},
 
 					Sticker: ctx.Message.Sticker,
 				}
@@ -668,7 +707,7 @@ func (b *Bot) handleReceivedMessages(message *telegram.Message) {
 			case ContextTypeAtVideoNote:
 				fn := b.specifiedTypeMessageProcessorFunc[ctx.MessageType].(ProcessorAtVideoNoteFunc)
 				c := &MessageContextAtVideoNote{
-					MessageContextBase: base,
+					MessageContextIncludeFile: MessageContextIncludeFile{MessageContextBase: base},
 
 					VideoNote: ctx.Message.VideoNote,
 				}
@@ -701,7 +740,7 @@ func (b *Bot) handleReceivedMessages(message *telegram.Message) {
 			case ContextTypeAtGame:
 				fn := b.specifiedTypeMessageProcessorFunc[ctx.MessageType].(ProcessorAtGameFunc)
 				c := &MessageContextAtGame{
-					MessageContextBase: base,
+					MessageContextIncludeFile: MessageContextIncludeFile{MessageContextBase: base},
 
 					Game: ctx.Message.Game,
 				}

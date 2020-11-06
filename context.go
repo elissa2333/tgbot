@@ -7,6 +7,7 @@ import (
 	"net/http"
 
 	"github.com/elissa2333/tgbot/telegram"
+	"github.com/elissa2333/tgbot/utils"
 )
 
 const (
@@ -49,9 +50,24 @@ type Context struct {
 	Message       *telegram.Message // 接收到的消息
 }
 
-// DownloadFile 下载文件 (该方法不是官方封装)
+// GetChatID 获取会话 ID
+func (c Context) GetChatID() string {
+	if c.Message != nil {
+		if c.Message.Chat != nil {
+			return utils.ToString(c.Message.Chat.ID)
+		}
+	}
+	return ""
+}
+
+// GetDownloadURL 获取文件下载地址下载地址
+func (c Context) GetDownloadURL(filePath string) string {
+	return fmt.Sprintf("https://api.telegram.org/file/bot%d:%s/%s", c.ID, c.Token, filePath)
+}
+
+//DownloadFile 下载文件
 func (c Context) DownloadFile(filePath string) (io.ReadCloser, error) {
-	res, err := c.HTTPClient.DeleteBaseURL().Get(fmt.Sprintf("https://api.telegram.org/file/bot%d:%s/%s", c.ID, c.Token, filePath))
+	res, err := c.HTTPClient.DeleteBaseURL().Get(c.GetDownloadURL(filePath))
 	if err != nil {
 		return nil, err
 	}
