@@ -107,19 +107,18 @@ const (
 	FormatTypeAtMarkdown = "Markdown" // https://core.telegram.org/bots/api#markdown-style
 )
 
-// ForwardMessage 转发任何类型的消息。成功后，将返回发送的消息
-// https://core.telegram.org/bots/api#forwardmessage
-func (a API) ForwardMessage(chatID string /*目标聊天的唯一标识符或目标频道的用户名（格式为@channelusername）*/, fromChatID string /*发送原始消息的聊天的唯一标识符（或格式为的频道用户名@channelusername）*/, disableNotification bool /*静默发送消息。用户将收到没有声音的通知*/, messageID int /*在 fromChatID 中指定的聊天中的消息标识符*/) (*Message, error) {
-	m := map[string]interface{}{"chat_id": chatID, "from_chat_id": fromChatID, "disable_notification": disableNotification, "message_id": messageID}
-	res, err := a.HTTPClient.SetBody(m).Post("/forwardMessage")
-	if err != nil {
-		return nil, err
-	}
-	defer res.Body.Close()
+// ForwardMessageOptional ForwardMessage 可选参数
+type ForwardMessageOptional struct {
+	DisableNotification bool `json:"disable_notification"` // 静默发送消息。用户将收到没有声音的通知。
+}
 
-	msg := &Message{}
-	err = HandleResp(res, msg)
-	return msg, err
+// ForwardMessage 转发任何类型的消息。成功后，将返回发送的 Message
+// https://core.telegram.org/bots/api#forwardmessage
+func (a API) ForwardMessage(chatID string, fromChatID string, messageID int64, optional *ForwardMessageOptional) (*Message, error) {
+	m := map[string]interface{}{"chat_id": chatID, "from_chat_id": fromChatID, "message_id": messageID}
+	result := &Message{}
+	err := a.handleOptional("/forwardMessage", m, optional, result)
+	return result, err
 }
 
 // CopyMessageOptional CopyMessage 可选参数
@@ -133,10 +132,14 @@ type CopyMessageOptional struct {
 	ReplyMarkup              interface{}     `json:"reply_markup"`                // 其他界面选项。内联键盘，自定义回复键盘，删除回复键盘或强制用户回复的说明的JSON序列化对象。
 }
 
-// 使用此方法可以复制任何类型的消息。该方法类似于forwardMessages方法，但是复制的消息没有指向原始消息的链接。成功返回已发送消息的MessageId。
+// CopyMessage 使用此方法可以复制任何类型的消息。该方法类似于forwardMessages方法，但是复制的消息没有指向原始消息的链接。成功返回已发送消息的MessageId。
 // https://core.telegram.org/bots/api#copymessage
-func (a API) CopyMessage(chatID string, fromChatID string, messageID int64) error { // TODO 未测试
-	return errors.New("TODO")
+func (a API) CopyMessage(chatID string, fromChatID string, messageID int64, optional *CopyMessageOptional) (int64, error) {
+	result := &struct {
+		MessageID int64 `json:"message_id"`
+	}{}
+	err := a.handleOptional("/copyMessage", map[string]interface{}{"chat_id": chatID, "from_chat_id": fromChatID, "message_id": messageID}, optional, result)
+	return result.MessageID, err
 }
 
 // handleSendMedia 处理媒体发送
@@ -523,27 +526,12 @@ type SendPollOptional struct {
 	ReplyMarkup              interface{} `json:"reply_markup,omitempty"`            // 其他界面选项。内联键盘，自定义回复键盘，删除回复键盘或强制用户回复的说明的JSON序列化对象。
 }
 
-// SendPoll 发送本机轮询。成功后，将返回发送的消息。
+// SendPoll 发送投票。成功后，将返回发送的 Message
 // https://core.telegram.org/bots/api#sendpoll
 func (a API) SendPoll(chatID string, question string, options []string, optional *PollOption) (*Message, error) {
-	m := map[string]interface{}{"chat_id": chatID, "question": question}
-	if optional != nil {
-		o, err := utils.StructToMap(optional)
-		if err != nil {
-			return nil, err
-		}
-		for k, v := range o {
-			m[k] = v
-		}
-	}
-
-	res, err := a.HTTPClient.SetBody(m).Post("/sendcontact")
-	if err != nil {
-		return nil, err
-	}
-
+	m := map[string]interface{}{"chat_id": chatID, "question": question, "options": options}
 	result := &Message{}
-	err = HandleResp(res, result)
+	err := a.handleOptional("/sendPoll", m, optional, result)
 	return result, err
 }
 
@@ -658,16 +646,21 @@ func (a API) GetFile(fileID string) (*File, error) {
 // handleOptional 处理可选参数
 func (a API) handleOptional(url string, m map[string]interface{}, optional interface{}, result interface{}) error {
 	if m == nil {
-		return errors.New("default parameter is nul")
+		m = map[string]interface{}{}
 	}
 
-	if !reflect.ValueOf(optional).IsNil() {
-		o, err := utils.StructToMap(optional)
-		if err != nil {
-			return err
-		}
-		for k, v := range o {
-			m[k] = v
+	o, err := utils.StructToMap(optional)
+	if err != nil && err.Error() != "input data is nil" && err.Error() != "input data type is not a struct" {
+		return err
+	}
+
+	for k, v := range o {
+		m[k] = v
+	}
+
+	for k, v := range m {
+		if v == nil {
+			delete(m, k)
 		}
 	}
 
@@ -693,6 +686,7 @@ func (a API) KickChatMember(chatID string, userID int64, optional *KickChatMembe
 	return result, err
 }
 
+// UnbanChatMemberOptional UnbanChatMember 可选参数
 type UnbanChatMemberOptional struct {
 	OnlyIfBanned bool `json:"only_if_banned"` // 如果不禁止用户，则不执行任何操作
 }
@@ -875,7 +869,7 @@ func (a API) UnpinChatMessage(chatID string, optional *UnpinChatMessageOptional)
 	return result, err
 }
 
-// 使用此方法可以清除聊天中的固定消息列表。如果该聊天不是私人聊天，则该bot必须是该聊天的管理员才能正常工作，并且必须在超级组中具有“can_pin_messages”管理员权限，或者在一个频道中必须具有“can_edit_messages”管理员权限。成功返回True。
+// UnpinAllChatMessages 使用此方法可以清除聊天中的固定消息列表。如果该聊天不是私人聊天，则该bot必须是该聊天的管理员才能正常工作，并且必须在超级组中具有“can_pin_messages”管理员权限，或者在一个频道中必须具有“can_edit_messages”管理员权限。成功返回True。
 // https://core.telegram.org/bots/api#unpinallchatmessages
 func (a API) UnpinAllChatMessages(chatID string) (bool, error) {
 	var result bool

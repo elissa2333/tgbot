@@ -56,21 +56,25 @@ func ToInt(in interface{}) int {
 // StructToMap 将 struct 转化为 map
 // 如果 struct field 拥有 Name 字段则自动 bind 为 struct 名 （json 库的坑）
 func StructToMap(src interface{}) (map[string]interface{}, error) {
-	refType := reflect.TypeOf(src)
-
-	if refType.Kind() != reflect.Struct {
-		if refType.Elem().Kind() == reflect.Struct {
-			return StructToMap(reflect.ValueOf(src).Elem().Interface())
+	if src != nil {
+		refValue := reflect.ValueOf(src)
+		if refValue.Kind() == reflect.Ptr {
+			if refValue.IsNil() {
+				return nil, errors.New("input data is nil")
+			}
+			refValue = refValue.Elem()
 		}
-		return nil, errors.New("input is not a struct")
+		if refValue.Kind() == reflect.Struct {
+			temp, err := json.Marshal(src)
+			if err != nil {
+				return nil, err
+			}
+
+			result := map[string]interface{}{}
+			err = json.Unmarshal(temp, &result)
+			return result, err
+		}
 	}
 
-	temp, err := json.Marshal(src)
-	if err != nil {
-		return nil, err
-	}
-
-	result := map[string]interface{}{}
-	err = json.Unmarshal(temp, &result)
-	return result, err
+	return nil, errors.New("input data type is not a struct")
 }

@@ -484,7 +484,7 @@ type ChatPermissions struct {
 	CanPinMessages        bool `json:"can_pin_messages,omitempty"`          // 可选的。True，如果允许用户固定消息。在公共超级组中被忽略
 }
 
-// ChatLocation
+// ChatLocation 代表聊天连接的位置
 // https://core.telegram.org/bots/api#chatlocation
 type ChatLocation struct {
 	Location *Location `json:"location"` // 超组连接到的位置。不能是居住地点。
@@ -498,9 +498,15 @@ type BotCommand struct {
 	Description string `json:"description,omitempty"` // 命令说明，3-256个字符。
 }
 
-// InputMedia
-// 要发送的媒体消息的内容
+// InputMedia 要发送的媒体消息的内容（注：应该是下面几种类型中的一种）
 // https://core.telegram.org/bots/api#inputmedia
+type InputMedia struct {
+	*InputMediaAnimation
+	*InputMediaDocument
+	*InputMediaAudio
+	*InputMediaPhoto
+	*InputMediaVideo
+}
 
 // InputMediaPhotoType 照片类型
 const InputMediaPhotoType = "photo"
@@ -509,7 +515,7 @@ const InputMediaPhotoType = "photo"
 // https://core.telegram.org/bots/api#inputmediaphoto
 type InputMediaPhoto struct {
 	Type            string          `json:"type,omitempty"`       // 结果类型，必须是 photo
-	Media           string          `json:"media,omitempty"`      // 文件发送。传递file_id以发送电报服务器上存在的文件（推荐），传递电报的HTTP URL以从Internet获取文件，或传递“ attach：// <file_attach_name>”以使用multipart / <file_attach_name>名称下的form-data。
+	Media           string          `json:"media,omitempty"`      // 文件发送。传递file_id以发送电报服务器上存在的文件（推荐），传递电报的HTTP URL以从Internet获取文件，或传递“attach://<file_attach_name>”以使用multipart/<file_attach_name>名称下的form-data。
 	Caption         string          `json:"caption,omitempty"`    // 可选的。要发送的照片的标题，实体解析后0-1024个字符
 	ParseMode       string          `json:"parse_mode,omitempty"` // 可选的。解析照片标题中的实体的模式。有关更多详细信息，请参见格式化选项。
 	CaptionEntities []MessageEntity `json:"caption_entities"`     // 可选的。标题中显示的特殊实体的列表，可以指定这些实体，而不是parse_mode

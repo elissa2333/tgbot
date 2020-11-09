@@ -2,6 +2,8 @@ package telegram
 
 import (
 	"errors"
+
+	"github.com/elissa2333/tgbot/utils"
 )
 
 // https://core.telegram.org/bots/api#updating-messages
@@ -55,18 +57,46 @@ func (a API) EditMessageCaption(optional EditMessageCaptionOptional) (*Message, 
 
 // EditMessageMediaOptional EditMessageMedia 可选参数
 type EditMessageMediaOptional struct {
-	ChatID    string `json:"chat_id"`    // 如果未指定inline_message_id，则为必需。目标聊天的唯一标识符或目标频道的用户名（格式为@channelusername）
-	MessageID int64  `json:"message_id"` // 如果未指定inline_message_id，则为必需。要编辑的消息的标识符
+	ChatID    string `json:"chat_id,omitempty"`    // 如果未指定inline_message_id，则为必需。目标聊天的唯一标识符或目标频道的用户名（格式为@channelusername）
+	MessageID int64  `json:"message_id,omitempty"` // 如果未指定inline_message_id，则为必需。要编辑的消息的标识符
 
-	InlineMessageID string `json:"inline_message_id"` // 如果未指定chat_id和message_id，则为必需。内联消息的标识符
+	InlineMessageID string `json:"inline_message_id,omitempty"` // 如果未指定chat_id和message_id，则为必需。内联消息的标识符
 
-	ReplyMarkup *InlineKeyboardMarkup `json:"reply_markup"` // 用于新的嵌入式键盘的JSON序列化对象。
+	ReplyMarkup *InlineKeyboardMarkup `json:"reply_markup,omitempty"` // 用于新的嵌入式键盘的JSON序列化对象。
 }
 
 // EditMessageMedia 使用此方法可以编辑动画，音频，文档，照片或视频消息。如果消息是消息专辑的一部分，则只能将其编辑为音频专辑的音频，仅可以编辑为文档专辑的文档，否则为照片或视频。编辑嵌入式消息时，无法上载新文件。通过文件file_id使用先前上传的文件或指定URL。成功后，如果已编辑的消息是由漫游器发送的，则返回已编辑的 Message，否则返回True。
 // https://core.telegram.org/bots/api#editmessagemedia
 func (a API) EditMessageMedia(media InputMedia, optional EditMessageMediaOptional) (*Message, error) { // TODO
-	return nil, errors.New("TODO")
+	m := map[string]interface{}{}
+	var err error
+	switch {
+	case media.InputMediaAnimation != nil:
+		m, err = utils.StructToMap(media.InputMediaAnimation)
+	case media.InputMediaDocument != nil:
+		m, err = utils.StructToMap(media.InputMediaDocument)
+	case media.InputMediaAudio != nil:
+		m, err = utils.StructToMap(media.InputMediaAudio)
+	case media.InputMediaPhoto != nil:
+		m, err = utils.StructToMap(media.InputMediaPhoto)
+	case media.InputMediaVideo != nil:
+		m, err = utils.StructToMap(media.InputMediaVideo)
+	default:
+		return nil, errors.New("did not fill in any content")
+	}
+	if err != nil {
+		return nil, err
+	}
+
+	mBody, err := utils.StructToMap(optional)
+	if err != nil {
+		return nil, err
+	}
+	mBody["media"] = m
+
+	result := &Message{}
+	err = a.handleOptional("/editMessageMedia", mBody, nil, result)
+	return result, err
 }
 
 // EditMessageReplyMarkupOptional EditMessageReplyMarkup 可选参数
@@ -81,7 +111,7 @@ type EditMessageReplyMarkupOptional struct {
 
 // EditMessageReplyMarkup 使用此方法可以编辑动画，音频，文档，照片或视频消息。如果消息是消息专辑的一部分，则只能将其编辑为音频专辑的音频，仅可以编辑为文档专辑的文档，否则为照片或视频。编辑嵌入式消息时，无法上载新文件。通过文件file_id使用先前上传的文件或指定URL。成功后，如果已编辑的消息是由漫游器发送的，则返回已编辑的 Message，否则返回True。
 // https://core.telegram.org/bots/api#editmessagemedia
-func (a API) EditMessageReplyMarkup(optional EditMessageReplyMarkupOptional) (*Message, error) {
+func (a API) EditMessageReplyMarkup(optional EditMessageReplyMarkupOptional) (*Message, error) { // TODO 未测试
 	result := &Message{}
 	err := a.handleOptional("/editMessageReplyMarkup", nil, &optional, result)
 	return result, err
@@ -94,9 +124,9 @@ type StopPollOptional struct {
 
 // StopPoll 使用此方法停止由漫游器发送的轮询。成功后，将返回已停止的具有最终结果的 Poll。
 // https://core.telegram.org/bots/api#stoppoll
-func (a API) StopPoll(chatID string, messageID int64, optional StopPollOptional) (*Poll, error) {
+func (a API) StopPoll(chatID string, messageID int64, optional *StopPollOptional) (*Poll, error) {
 	result := &Poll{}
-	err := a.handleOptional("/stopPoll", map[string]interface{}{"chat_id": chatID, "message_id": messageID}, &optional, result)
+	err := a.handleOptional("/stopPoll", map[string]interface{}{"chat_id": chatID, "message_id": messageID}, optional, result)
 	return result, err
 }
 
@@ -112,6 +142,6 @@ func (a API) StopPoll(chatID string, messageID int64, optional StopPollOptional)
 // https://core.telegram.org/bots/api#deletemessage
 func (a API) DeleteMessage(chatID string, messageID int64) (bool, error) {
 	var result bool
-	err := a.handleOptional("/deleteMessage", nil, nil, &result)
+	err := a.handleOptional("/deleteMessage", map[string]interface{}{"chat_id": chatID, "message_id": messageID}, nil, &result)
 	return result, err
 }
