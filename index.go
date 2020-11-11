@@ -39,8 +39,9 @@ type Bot struct {
 	specifiedTypeMessageProcessorFunc map[string]interface{} // 指定类型消息处理器
 	defaultMessageProcessorFunc       MessageProcessorFunc   // 默认消息处理器
 
-	done chan struct{} // 退出程序
-	err  chan error
+	inlineQueryProcessorFunc InlineQueryProcessorFunc // 内联处理函数
+	done                     chan struct{}            // 退出程序
+	err                      chan error
 }
 
 // BotOptional bot 配置可选参数
@@ -106,12 +107,16 @@ func (b *Bot) SetWebhook(url string /*API 访问地址*/, address string /*本�
 				return
 			}
 
-			if m.UpdateID == 0 || m.Message == nil { // 坏请求
+			if m.UpdateID == 0 { // 坏请求
 				writer.WriteHeader(http.StatusBadRequest)
 				return
 			}
 
-			b.handleReceivedMessages(m.Message)
+			if b.inlineQueryProcessorFunc != nil {
+				b.handleInlineQuery(m.InlineQuery)
+			} else {
+				b.handleReceivedMessages(m.Message)
+			}
 		})
 
 		return http.ListenAndServe(address, nil)
@@ -434,6 +439,20 @@ func (b *Bot) SetMessageProcessor(handleMessageFunc MessageProcessorFunc) {
 	b.defaultMessageProcessorFunc = handleMessageFunc
 }
 
+// InlineQueryContext 内联调用上下文
+type InlineQueryContext struct {
+	*telegram.API
+	*telegram.InlineQuery
+}
+
+// InlineQueryProcessorFunc 内联处理函数
+type InlineQueryProcessorFunc func(c *InlineQueryContext) error
+
+// SetInlineQueryProcessor 设置内联处理器
+func (b *Bot) SetInlineQueryProcessor(fn InlineQueryProcessorFunc) {
+	b.inlineQueryProcessorFunc = fn
+}
+
 // AddActiveProcessor 添加主动处理器
 func (b *Bot) AddActiveProcessor(activeProcessorFunc ActiveProcessorFunc) {
 	if activeProcessorFunc != nil {
@@ -460,6 +479,7 @@ func (b *Bot) Run() error {
 		if err := b.DeleteWebhook(nil); err != nil {
 			return err
 		}
+		b.checkTask()
 		go b.initiativeEngine()
 	}
 
@@ -497,7 +517,7 @@ func (b *Bot) checkTask() {
 		}(vFn)
 	}
 
-	if len(b.commands) != 0 || b.defaultCommand != nil || b.defaultMessageProcessorFunc != nil || len(b.specifiedTypeMessageProcessorFunc) != 0 { // 统计被动
+	if len(b.commands) != 0 || b.defaultCommand != nil || b.defaultMessageProcessorFunc != nil || len(b.specifiedTypeMessageProcessorFunc) != 0 || b.inlineQueryProcessorFunc != nil { // 统计被动
 		totalNumberOfActiveAndPassive++
 	}
 
@@ -517,8 +537,6 @@ func (b *Bot) checkTask() {
 
 // initiativeEngine 核心调度
 func (b *Bot) initiativeEngine() {
-	b.checkTask()
-
 	for {
 		updates, err := b.API.GetUpdates(b.MsgOffset, 1, b.timeout)
 		if err != nil {
@@ -532,8 +550,27 @@ func (b *Bot) initiativeEngine() {
 		LastOneUpdate := updates[len(updates)-1]
 		b.MsgOffset = LastOneUpdate.UpdateID + 1 // 记录消息偏量
 
-		b.handleReceivedMessages(updates[0].Message)
+		if LastOneUpdate.InlineQuery != nil {
+			b.handleInlineQuery(LastOneUpdate.InlineQuery)
+		} else {
+			b.handleReceivedMessages(updates[0].Message)
+		}
 	}
+}
+
+// handleInlineQuery 处理内联查询
+func (b *Bot) handleInlineQuery(query *telegram.InlineQuery) {
+	go func() {
+		if b.inlineQueryProcessorFunc != nil {
+			err := b.inlineQueryProcessorFunc(&InlineQueryContext{
+				API:         b.API,
+				InlineQuery: query,
+			})
+			if err != nil {
+				b.handleError(err)
+			}
+		}
+	}()
 }
 
 // handleReceivedMessages 处理接收消息

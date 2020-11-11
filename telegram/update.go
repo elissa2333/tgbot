@@ -24,7 +24,7 @@ type Update struct {
 	EditedMessage      *Message            `json:"edited_message,omitempty"`       // 可选的。机器人已知并已编辑的消息的新版本
 	ChannelPost        *Message            `json:"channel_post,omitempty"`         // 可选的。任何形式的新传入频道帖子-文字，照片，贴纸等。
 	EditedChannelPost  *Message            `json:"edited_channel_post,omitempty"`  // 可选的。机器人已知并已编辑的频道发布的新版本
-	InlineQuery        *Location           `json:"inline_query,omitempty"`         // 可选的。新的传入内联查询
+	InlineQuery        *InlineQuery        `json:"inline_query,omitempty"`         // 可选的。新的传入内联查询
 	ChosenInlineResult *ChosenInlineResult `json:"chosen_inline_result,omitempty"` // 可选的。用户选择并发送给他们的聊天伙伴的内联查询的结果。请参阅收集反馈的文档，以获取有关如何为您的机器人启用这些更新的详细信息。
 	CallbackQuery      *CallbackQuery      `json:"callback_query,omitempty"`       // 可选的。新传入的回调查询
 	ShippingQuery      *ShippingQuery      `json:"shipping_query,omitempty"`       // 可选的。新的收货查询。仅适用于价格灵活的发票
