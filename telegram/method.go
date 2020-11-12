@@ -306,8 +306,8 @@ func (a API) SendVoice(chatID string, voice InputFile, optional *SendVoiceOption
 	return a.handleSendMedia("/sendVoice", chatID, "voice", voice, optional)
 }
 
-// OptionalVideoNoteOptional SendVideoNote可选参数
-type OptionalVideoNoteOptional struct {
+// SendVideoNoteOptional SendVideoNote可选参数
+type SendVideoNoteOptional struct {
 	Duration                 int64       `json:"duration,omitempty"`             // 发送视频的持续时间（以秒为单位）
 	Length                   int         `json:"length,omitempty"`               // 视频宽度和高度，即视频消息的直径
 	Thumb                    InputFile   `json:"thumb,omitempty"`                // 已发送文件的缩略图；如果服务器端支持文件的缩略图生成，则可以忽略。缩略图应为JPEG格式，并且大小应小于200 kB。缩略图的宽度和高度不应超过320。如果未使用multipart / form-data上传文件，则忽略该缩略图。缩略图不能重复使用，只能作为新文件上传，因此如果缩略图是使用<file_attach_name>下的multipart / form-data上传的，则可以传递“ attach：// <file_attach_name>”
@@ -319,7 +319,7 @@ type OptionalVideoNoteOptional struct {
 
 // SendVideoNote 从v.4.0开始，Telegram客户端支持最长1分钟的圆形mp4方形视频。使用此方法发送视频消息。
 // https://core.telegram.org/bots/api#sendvideonote
-func (a API) SendVideoNote(chatID string, videoNote InputFile, optional *OptionalVideoNoteOptional) (*Message, error) {
+func (a API) SendVideoNote(chatID string, videoNote InputFile, optional *SendVideoNoteOptional) (*Message, error) {
 	return a.handleSendMedia("/sendVideoNote", chatID, "video_note", videoNote, optional)
 }
 
