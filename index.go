@@ -197,7 +197,7 @@ func (mcf MessageContextIncludeFile) GetDownloadURL(filePath string) string {
 	return fmt.Sprintf("https://api.telegram.org/file/bot%d:%s/%s", mcf.ID, mcf.Token, filePath)
 }
 
-//DownloadFile 下载文件
+// DownloadFile 下载文件
 func (mcf MessageContextIncludeFile) DownloadFile(filePath string) (io.ReadCloser, error) {
 	res, err := mcf.HTTPClient.DeleteBaseURL().Get(mcf.GetDownloadURL(filePath))
 	if err != nil {
@@ -507,14 +507,15 @@ func (b *Bot) handleError(err error) {
 func (b *Bot) checkTask() {
 	totalNumberOfActiveAndPassive := 0
 	cleanActiveAndPassiveCh := make(chan struct{})
-	for _, vFn := range b.activeProcessorFunc {
+	for k, vFn := range b.activeProcessorFunc {
 		totalNumberOfActiveAndPassive++
-		go func(fn ActiveProcessorFunc) {
+		go func(index int, fn ActiveProcessorFunc) {
 			if err := fn(b.API); err != nil {
-				b.handleError(err)
+				humanRead := index + 1 // 从 0开始的改成人类可读数
+				b.handleError(fmt.Errorf("the %d AddActiveProcessor: %w", humanRead, err))
 			}
 			cleanActiveAndPassiveCh <- struct{}{}
-		}(vFn)
+		}(k, vFn)
 	}
 
 	if len(b.commands) != 0 || b.defaultCommand != nil || b.defaultMessageProcessorFunc != nil || len(b.specifiedTypeMessageProcessorFunc) != 0 || b.inlineQueryProcessorFunc != nil { // 统计被动
@@ -658,7 +659,7 @@ func (b *Bot) handleReceivedMessages(message *telegram.Message) {
 					Text:               ctx.Message.Text,
 				}
 				if err := fn(c); err != nil {
-					b.handleError(err)
+					b.handleError(fmt.Errorf("SetMessageProcessorAtText: %w", err))
 					return
 				}
 			case ContextTypeAtPhoto:
@@ -669,7 +670,7 @@ func (b *Bot) handleReceivedMessages(message *telegram.Message) {
 					Caption:                   ctx.Message.Caption,
 				}
 				if err := fn(c); err != nil {
-					b.handleError(err)
+					b.handleError(fmt.Errorf("SetMessageProcessorAtPhoto: %w", err))
 					return
 				}
 			case ContextTypeAtVoice:
@@ -679,7 +680,7 @@ func (b *Bot) handleReceivedMessages(message *telegram.Message) {
 					Voice:                     ctx.Message.Voice,
 				}
 				if err := fn(c); err != nil {
-					b.handleError(err)
+					b.handleError(fmt.Errorf("SetMessageProcessorAtVoice: %w", err))
 					return
 				}
 			case ContextTypeAtAudio:
@@ -691,7 +692,7 @@ func (b *Bot) handleReceivedMessages(message *telegram.Message) {
 					Caption: ctx.Message.Caption,
 				}
 				if err := fn(c); err != nil {
-					b.handleError(err)
+					b.handleError(fmt.Errorf("SetMessageProcessorAtAudio: %w", err))
 					return
 				}
 			case ContextTypeAtVideo:
@@ -703,7 +704,7 @@ func (b *Bot) handleReceivedMessages(message *telegram.Message) {
 					Caption: ctx.Message.Caption,
 				}
 				if err := fn(c); err != nil {
-					b.handleError(err)
+					b.handleError(fmt.Errorf("SetMessageProcessorAtVideo: %w", err))
 					return
 				}
 			case ContextTypeAtAnimation:
@@ -715,7 +716,7 @@ func (b *Bot) handleReceivedMessages(message *telegram.Message) {
 					Document:  ctx.Message.Document,
 				}
 				if err := fn(c); err != nil {
-					b.handleError(err)
+					b.handleError(fmt.Errorf("SetMessageProcessorAtAnimation: %w", err))
 					return
 				}
 			case ContextTypeAtDocument:
@@ -727,7 +728,7 @@ func (b *Bot) handleReceivedMessages(message *telegram.Message) {
 					Caption:  ctx.Message.Caption,
 				}
 				if err := fn(c); err != nil {
-					b.handleError(err)
+					b.handleError(fmt.Errorf("SetMessageProcessorAtDocument: %w", err))
 					return
 				}
 			case ContextTypeAtSticker:
@@ -738,7 +739,7 @@ func (b *Bot) handleReceivedMessages(message *telegram.Message) {
 					Sticker: ctx.Message.Sticker,
 				}
 				if err := fn(c); err != nil {
-					b.handleError(err)
+					b.handleError(fmt.Errorf("SetMessageProcessorAtSticker: %w", err))
 					return
 				}
 			case ContextTypeAtVideoNote:
@@ -749,7 +750,7 @@ func (b *Bot) handleReceivedMessages(message *telegram.Message) {
 					VideoNote: ctx.Message.VideoNote,
 				}
 				if err := fn(c); err != nil {
-					b.handleError(err)
+					b.handleError(fmt.Errorf("SetMessageProcessorAtVideoNote: %w", err))
 					return
 				}
 			case ContextTypeAtContact:
@@ -760,7 +761,7 @@ func (b *Bot) handleReceivedMessages(message *telegram.Message) {
 					Contact: ctx.Message.Contact,
 				}
 				if err := fn(c); err != nil {
-					b.handleError(err)
+					b.handleError(fmt.Errorf("SetMessageProcessorAtContact: %w", err))
 					return
 				}
 			case ContextTypeAtDice:
@@ -771,7 +772,7 @@ func (b *Bot) handleReceivedMessages(message *telegram.Message) {
 					Dice: ctx.Message.Dice,
 				}
 				if err := fn(c); err != nil {
-					b.handleError(err)
+					b.handleError(fmt.Errorf("SetMessageProcessorAtDice: %w", err))
 					return
 				}
 			case ContextTypeAtGame:
@@ -782,7 +783,7 @@ func (b *Bot) handleReceivedMessages(message *telegram.Message) {
 					Game: ctx.Message.Game,
 				}
 				if err := fn(c); err != nil {
-					b.handleError(err)
+					b.handleError(fmt.Errorf("SetMessageProcessorAtGame: %w", err))
 					return
 				}
 			case ContextTypeAtPoll:
@@ -793,7 +794,7 @@ func (b *Bot) handleReceivedMessages(message *telegram.Message) {
 					Poll: ctx.Message.Poll,
 				}
 				if err := fn(c); err != nil {
-					b.handleError(err)
+					b.handleError(fmt.Errorf("SetMessageProcessorAtPoll: %w", err))
 					return
 				}
 			case ContextTypeAtVenue:
@@ -804,7 +805,7 @@ func (b *Bot) handleReceivedMessages(message *telegram.Message) {
 					Venue: ctx.Message.Venue,
 				}
 				if err := fn(c); err != nil {
-					b.handleError(err)
+					b.handleError(fmt.Errorf("SetMessageProcessorAtVenue: %w", err))
 					return
 				}
 			case ContextTypeAtLocation:
@@ -815,14 +816,14 @@ func (b *Bot) handleReceivedMessages(message *telegram.Message) {
 					Location: ctx.Message.Location,
 				}
 				if err := fn(c); err != nil {
-					b.handleError(err)
+					b.handleError(fmt.Errorf("SetMessageProcessorAtLocation: %w", err))
 					return
 				}
 			}
 		} else {
 			if b.defaultMessageProcessorFunc != nil { // 消息处理器
 				if err := b.defaultMessageProcessorFunc(ctx); err != nil {
-					b.handleError(err)
+					b.handleError(fmt.Errorf("SetMessageProcesso: %w", err))
 					return
 				}
 			}
