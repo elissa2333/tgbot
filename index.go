@@ -465,7 +465,7 @@ func (b *Bot) AddActiveProcessor(activeProcessorFunc ActiveProcessorFunc) {
 func (b *Bot) Run() error {
 	_, err := b.API.GetMe() // check api
 	if err != nil {
-		return err
+		return fmt.Errorf("check api call failed: %w", err)
 	}
 
 	if (b.webHookEngine) != nil { // 为了和主动处理器行为一致
