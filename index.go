@@ -8,6 +8,7 @@ import (
 	"io/ioutil"
 	"net/http"
 	stdURL "net/url"
+	"strings"
 
 	"github.com/elissa2333/httpc"
 
@@ -542,40 +543,59 @@ func (b *Bot) initiativeEngine() {
 		updates, err := b.API.GetUpdates(b.MsgOffset, 1, b.timeout)
 		if err != nil {
 			b.handleError(err)
-			break
+			return
 		}
 		if len(updates) == 0 {
 			continue
 		}
+		update := updates[0]
 
-		LastOneUpdate := updates[len(updates)-1]
-		b.MsgOffset = LastOneUpdate.UpdateID + 1 // 记录消息偏量
+		b.MsgOffset = update.UpdateID + 1 // 记录消息偏量
 
-		if LastOneUpdate.InlineQuery != nil {
-			b.handleInlineQuery(LastOneUpdate.InlineQuery)
-		} else {
-			b.handleReceivedMessages(updates[0].Message)
+		switch {
+		default:
+			continue
+		case update.Message != nil:
+			go b.handleReceivedMessages(update.Message)
+		// case update.EditedMessage != nil:
+		// case update.ChannelPost != nil:
+		// case update.EditedChannelPost != nil:
+		case update.InlineQuery != nil:
+			go b.handleInlineQuery(update.InlineQuery)
+
+			// case update.ChosenInlineResult != nil:
+			// case update.CallbackQuery != nil:
+			// case update.ShippingQuery != nil:
+			// case update.PreCheckoutQuery != nil:
+			// case update.Poll != nil:
+			// case update.PollAnswer != nil:
 		}
 	}
 }
 
 // handleInlineQuery 处理内联查询
 func (b *Bot) handleInlineQuery(query *telegram.InlineQuery) {
-	go func() {
-		if b.inlineQueryProcessorFunc != nil {
-			err := b.inlineQueryProcessorFunc(&InlineQueryContext{
-				API:         b.API,
-				InlineQuery: query,
-			})
-			if err != nil {
-				b.handleError(err)
-			}
+	if query == nil {
+		return
+	}
+
+	if b.inlineQueryProcessorFunc != nil {
+		err := b.inlineQueryProcessorFunc(&InlineQueryContext{
+			API:         b.API,
+			InlineQuery: query,
+		})
+		if err != nil {
+			b.handleError(err)
 		}
-	}()
+	}
 }
 
 // handleReceivedMessages 处理接收消息
 func (b *Bot) handleReceivedMessages(message *telegram.Message) {
+	if message == nil {
+		return
+	}
+
 	ctx := &Context{
 		Message: message,
 		API:     b.API,
@@ -618,19 +638,33 @@ func (b *Bot) handleReceivedMessages(message *telegram.Message) {
 	go func() {
 		for _, messageEntity := range message.Entities { // 可能是 bot
 			if messageEntity.Type == telegram.MessageEntityAtBotCommand {
-				fn, ok := b.commands[message.Text]
+				/*命令格式
+				/foo
+				/foo bar
+				*/
+
+				sp := strings.SplitN(message.Text, " ", 2)
+				cmd := sp[0]
+				fn, ok := b.commands[cmd]
 				if !ok {
 					if b.defaultCommand != nil { // 默认命令处理器
 						if err := b.defaultCommand(ctx); err != nil {
 							b.handleError(err)
+							return
 						}
 					}
 
 					break // 默认命令处理器不存在则转为消息处理器进行处理
 				}
 
+				text := ""
+				if len(sp) == 2 {
+					text = sp[1]
+				}
+				ctx.Message.Text = text         // 抹除命令
 				if err := fn(ctx); err != nil { // 命令处理器
 					b.handleError(err)
+					return
 				}
 			}
 		}
